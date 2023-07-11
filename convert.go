@@ -41,12 +41,13 @@ type ConvertImageOptions struct {
 	// which case we'll generate one and throw it away after.
 	AttestationURL string
 
-	// Used to measure the environment.  If left unset (0), defaults will be applied.
+	// Used to measure the environment.  If left unset (0, ""), defaults will be applied.
 	CPUs       int
 	Memory     int
 	Filesystem string
 
-	// Can be manually set.  If left unset (""), reasonable values will be used.
+	// Can be manually set.  If left unset ("", false, nil), reasonable values will be used.
+	TeeType                    TeeType
 	IgnoreChainRetrievalErrors bool
 	IgnoreAttestationErrors    bool
 	WorkloadID                 string
@@ -85,6 +86,10 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 	logger := options.Logger
 	if logger == nil {
 		logger = logrus.StandardLogger()
+	}
+	teeType := options.TeeType
+	if teeType == "" {
+		teeType = SEV
 	}
 
 	// Now create the target working container, pulling the base image if
@@ -248,13 +253,19 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 
 	// Build the krun configuration file that we store in the container image and on the disk image.
 	logger.Log(logrus.DebugLevel, "generating workload configuration")
-	teeData := SEVWorkloadData{
-		VendorChain:             vendorChain,
-		AttestationServerPubkey: "",
-	}
-	teeDataBytes, err := json.Marshal(teeData)
-	if err != nil {
-		return "", nil, "", err
+	var teeDataBytes []byte
+	switch teeType {
+	case SEV, SNP:
+		teeData := sevWorkloadData{
+			VendorChain:             vendorChain,
+			AttestationServerPubkey: "",
+		}
+		teeDataBytes, err = json.Marshal(teeData)
+		if err != nil {
+			return "", nil, "", err
+		}
+	default:
+		return "", nil, "", fmt.Errorf("don't know how to generate tee_data for %q TEEs", teeType)
 	}
 	workloadID := options.WorkloadID
 	if workloadID == "" {
@@ -271,8 +282,8 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 		}
 		workloadID = digest.Canonical.FromBytes(append(append([]byte{}, rawImageID...), randomizedBytes...)).Encoded()
 	}
-	workloadConfig := WorkloadConfig{
-		Type:           SEV,
+	workloadConfig := workloadConfig{
+		Type:           teeType,
 		WorkloadID:     workloadID,
 		CPUs:           nCPUs,
 		Memory:         memory,
@@ -323,20 +334,26 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 	}
 
 	// Build the workload registration (attestation) request body.
-	teeConfig := TeeConfig{
-		Flags: TeeConfigFlags{
-			Bits: 63,
-		},
-		MinFW: TeeConfigMinFW{
-			Major: 0,
-			Minor: 0,
-		},
+	var teeConfigBytes []byte
+	switch teeType {
+	case SEV, SNP:
+		teeConfig := teeConfig{
+			Flags: teeConfigFlags{
+				Bits: 63,
+			},
+			MinFW: teeConfigMinFW{
+				Major: 0,
+				Minor: 0,
+			},
+		}
+		teeConfigBytes, err = json.Marshal(teeConfig)
+		if err != nil {
+			return "", nil, "", err
+		}
+	default:
+		return "", nil, "", fmt.Errorf("don't know how to generate tee_config for %q TEEs", teeType)
 	}
-	teeConfigBytes, err := json.Marshal(teeConfig)
-	if err != nil {
-		return "", nil, "", err
-	}
-	attestationRequest := AttestationRequest{
+	attestationRequest := attestationRequest{
 		WorkloadID:        workloadConfig.WorkloadID,
 		LaunchMeasurement: measurement,
 		TeeConfig:         string(teeConfigBytes),
@@ -406,7 +423,7 @@ func generateDiskEncryptionPassphrase() (string, error) {
 }
 
 // generate the measurement using the CPU count, memory size, and the firmware shared library, whatever it's called, wherever it is
-func generateMeasurement(workloadConfig WorkloadConfig) (string, error) {
+func generateMeasurement(workloadConfig workloadConfig) (string, error) {
 	cpuString := fmt.Sprintf("%d", workloadConfig.CPUs)
 	memoryString := fmt.Sprintf("%d", workloadConfig.Memory)
 	var prefix string
@@ -442,7 +459,7 @@ func generateMeasurement(workloadConfig WorkloadConfig) (string, error) {
 				cmd.Stderr = &stderr
 				if err := cmd.Run(); err != nil {
 					if stderr.Len() > 0 {
-						err = fmt.Errorf("%s: %w", stderr.String(), err)
+						err = fmt.Errorf("krunfw_measurement: %s: %w", strings.TrimSpace(stderr.String()), err)
 					}
 					return "", err
 				}
