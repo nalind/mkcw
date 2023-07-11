@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -102,7 +103,7 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 	if err != nil {
 		return "", nil, "", fmt.Errorf("mounting target container: %w", err)
 	}
-	if err := os.Mkdir(filepath.Join(targetDir, "tmp"), os.ModeSticky|0o777); err != nil {
+	if err := os.Mkdir(filepath.Join(targetDir, "tmp"), os.ModeSticky|0o777); err != nil && !errors.Is(err, os.ErrExist) {
 		return "", nil, "", fmt.Errorf("creating tmp in target container: %w", err)
 	}
 
