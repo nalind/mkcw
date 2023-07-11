@@ -30,15 +30,21 @@ import (
 type ConvertImageOptions struct {
 	// Required parameters.
 	InputImage string
-	// If supplied, we'll tag the resulting image.
+
+	// If supplied, we'll tag the resulting image with the specified name.
 	Tag         string
 	OutputImage types.ImageReference
+
 	// If supplied, we'll register the workload with this server.
+	// Practically necessary if DiskEncryptionPassphrase is not set, in
+	// which case we'll generate one and throw it away after.
 	AttestationURL string
+
 	// Used to measure the environment.  If left unset (0), defaults will be applied.
 	CPUs       int
 	Memory     int
 	Filesystem string
+
 	// Can be manually set.  If left unset (""), reasonable values will be used.
 	IgnoreChainRetrievalErrors bool
 	IgnoreAttestationErrors    bool
@@ -55,7 +61,13 @@ const (
 	defaultFilesystem        = "ext4"
 )
 
+// ConvertImage takes the rootfs and configuration from one image, generates a
+// LUKS-encrypted disk image that more or less includes them both, and puts the
+// result into a new container image.
+// Returns the new image's ID and digest on success, along with a canonical
+// reference for it if a repository name was specified.
 func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store storage.Store, options ConvertImageOptions) (string, reference.Canonical, digest.Digest, error) {
+	// Apply our defaults if some options aren't set.
 	attestationURL := options.AttestationURL
 	nCPUs := options.CPUs
 	if nCPUs == 0 {
@@ -74,38 +86,12 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 		logger = logrus.StandardLogger()
 	}
 
-	// Mount the source image, pulling it first if necessary.
-	builderOptions := buildah.BuilderOptions{
-		FromImage:     options.InputImage,
-		SystemContext: systemContext,
-		Logger:        logger,
-	}
-	source, err := buildah.NewBuilder(ctx, store, builderOptions)
-	if err != nil {
-		return "", nil, "", fmt.Errorf("creating container from source image: %w", err)
-	}
-	defer source.Delete()
-	sourceInfo := buildah.GetBuildInfo(source)
-	if err != nil {
-		return "", nil, "", fmt.Errorf("retrieving info about source image: %w", err)
-	}
-	sourceSize, err := store.ImageSize(source.FromImageID)
-	if err != nil {
-		return "", nil, "", fmt.Errorf("computing size of source image: %w", err)
-	}
-	if sourceSize < 0 {
-		sourceSize = 1024 * 1024 * 1024 // wild guess
-	}
-	sourceDir, err := source.Mount("")
-	if err != nil {
-		return "", nil, "", fmt.Errorf("mounting source container: %w", err)
-	}
-
 	// Now create the target working container, pulling the base image if
 	// there is one and it isn't present.
-	builderOptions = buildah.BuilderOptions{
+	builderOptions := buildah.BuilderOptions{
 		FromImage:     options.BaseImage,
 		SystemContext: systemContext,
+		Logger:        logger,
 	}
 	target, err := buildah.NewBuilder(ctx, store, builderOptions)
 	if err != nil {
@@ -115,6 +101,18 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 	targetDir, err := target.Mount("")
 	if err != nil {
 		return "", nil, "", fmt.Errorf("mounting target container: %w", err)
+	}
+	if err := os.Mkdir(filepath.Join(targetDir, "tmp"), os.ModeSticky|0o777); err != nil {
+		return "", nil, "", fmt.Errorf("creating tmp in target container: %w", err)
+	}
+
+	// Copy the entrypoint in.
+	if entrypoint, err := os.Open("entrypoint"); err == nil {
+		if targetEntrypoint, err := os.OpenFile(filepath.Join(targetDir, "entrypoint"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o700); err == nil {
+			io.Copy(targetEntrypoint, entrypoint)
+			targetEntrypoint.Close()
+		}
+		entrypoint.Close()
 	}
 
 	// Save the certificates for the container image's root dir.
@@ -133,7 +131,34 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 			logger.Warnf("sevctl: %v", err)
 		}
 	}
-	imageID := sourceInfo.FromImageID
+
+	// Mount the source image, pulling it first if necessary.
+	builderOptions = buildah.BuilderOptions{
+		FromImage:     options.InputImage,
+		SystemContext: systemContext,
+		Logger:        logger,
+	}
+	source, err := buildah.NewBuilder(ctx, store, builderOptions)
+	if err != nil {
+		return "", nil, "", fmt.Errorf("creating container from source image: %w", err)
+	}
+	defer source.Delete()
+	sourceInfo := buildah.GetBuildInfo(source)
+	if err != nil {
+		return "", nil, "", fmt.Errorf("retrieving info about source image: %w", err)
+	}
+	sourceImageID := sourceInfo.FromImageID
+	sourceSize, err := store.ImageSize(source.FromImageID)
+	if err != nil {
+		return "", nil, "", fmt.Errorf("computing size of source image: %w", err)
+	}
+	if sourceSize < 0 {
+		sourceSize = 1024 * 1024 * 1024 // wild guess, but probably better than nothing
+	}
+	sourceDir, err := source.Mount("")
+	if err != nil {
+		return "", nil, "", fmt.Errorf("mounting source container: %w", err)
+	}
 
 	// Write part of the config blob where the krun init process will be looking for it.
 	// The oci2cw tool used `buildah inspect` output, but init is just looking for
@@ -232,10 +257,13 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 	}
 	workloadID := options.WorkloadID
 	if workloadID == "" {
-		rawImageID, err := hex.DecodeString(imageID)
+		rawImageID, err := hex.DecodeString(sourceImageID)
 		if err != nil {
-			rawImageID = []byte(imageID)
+			rawImageID = []byte(sourceImageID)
 		}
+		// add some randomness so that the attestation server can tell
+		// the difference between multiple images based on the same
+		// source image
 		randomizedBytes := make([]byte, 32)
 		if _, err := rand.Read(randomizedBytes); err != nil {
 			return "", nil, "", err
@@ -254,17 +282,9 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 	if err != nil {
 		return "", nil, "", err
 	}
+	// Store the krun configuration in the container image.
 	if err = ioutils.AtomicWriteFile(filepath.Join(targetDir, ".krun-sev.json"), workloadConfigBytes, 0o600); err != nil {
 		return "", nil, "", err
-	}
-
-	// Copy the entrypoint in.
-	if entrypoint, err := os.Open("entrypoint"); err == nil {
-		if targetEntrypoint, err := os.OpenFile(filepath.Join(targetDir, "entrypoint"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o700); err == nil {
-			io.Copy(targetEntrypoint, entrypoint)
-			targetEntrypoint.Close()
-		}
-		entrypoint.Close()
 	}
 
 	// Append the krun configuration to the disk image.
