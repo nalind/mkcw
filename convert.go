@@ -118,10 +118,12 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 	}
 
 	// Save the certificates for the container image's root dir.
+	vendorChain := "/" + certificateChainFilename
 	cmd := exec.Command("sevctl", "export", "-f", filepath.Join(targetDir, certificateChainFilename))
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
+		vendorChain = ""
 		if !options.IgnoreChainRetrievalErrors {
 			return "", nil, "", fmt.Errorf("retrieving SEV certificate chain: %v: %w", strings.TrimSpace(stderr.String()), err)
 		}
@@ -221,7 +223,7 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 	// Build the krun configuration file that we store in the container image and on the disk image.
 	logger.Log(logrus.DebugLevel, "generating workload configuration")
 	teeData := SEVWorkloadData{
-		VendorChain:             "/" + certificateChainFilename,
+		VendorChain:             vendorChain,
 		AttestationServerPubkey: "",
 	}
 	teeDataBytes, err := json.Marshal(teeData)
