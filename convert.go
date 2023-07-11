@@ -51,7 +51,7 @@ type ConvertImageOptions struct {
 const (
 	certificateChainFilename = "sev.chain"
 	defaultCPUs              = 2
-	defaultMemory            = 2
+	defaultMemory            = 512
 	defaultFilesystem        = "ext4"
 )
 
