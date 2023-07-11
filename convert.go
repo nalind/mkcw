@@ -367,8 +367,9 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 	target.SetUser("")
 	target.SetWorkDir("")
 	commitOptions := buildah.CommitOptions{
-		SystemContext: systemContext,
-		OmitHistory:   true,
+		SystemContext:  systemContext,
+		OmitHistory:    true,
+		AdditionalTags: []string{options.Tag},
 	}
 	return target.Commit(ctx, options.OutputImage, commitOptions)
 
