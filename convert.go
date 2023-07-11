@@ -71,7 +71,7 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 	}
 	logger := options.Logger
 	if logger == nil {
-		logger = logrus.New()
+		logger = logrus.StandardLogger()
 	}
 
 	// Mount the source image, pulling it first if necessary.
