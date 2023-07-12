@@ -1,6 +1,6 @@
 package mkcw
 
-// AttestationRequest is the type of the request which we use for registering
+// AttestationRequest is the body of the request which we use for registering
 // this confidential workload with the attestation server.
 type attestationRequest struct {
 	WorkloadID        string `json:"workload_id"`
