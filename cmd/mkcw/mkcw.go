@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 
 	"github.com/containers/image/v5/transports/alltransports"
 	"github.com/containers/image/v5/types"
@@ -31,6 +32,7 @@ func main() {
 	flag.StringVar(&options.WorkloadID, "workload-id", "", "workload ID (default: automatic)")
 	flag.StringVar(&options.DiskEncryptionPassphrase, "passphrase", "", "encryption passphrase (default: automatic)")
 	flag.StringVar(&options.BaseImage, "base-image", "", "alternate base image for final image")
+	flag.StringVar(&options.MountLabel, "mount-label", "", "force SELinux mount label")
 	flag.BoolVar(&options.IgnoreChainRetrievalErrors, "ignore-sevctl-errors", false, "ignore errors reading SEV certificate chain")
 	flag.BoolVar(&options.IgnoreAttestationErrors, "ignore-attestation-errors", false, "ignore errors registering workload")
 	flag.Parse()
@@ -90,6 +92,7 @@ func main() {
 	options.InputImage = inputName
 	options.OutputImage = outputRef
 	options.Tag = outputName
+	options.ReportWriter = os.Stdout
 	imageID, _, _, err := mkcw.TeeConvertImage(ctx, systemContext, store, options)
 	if err != nil {
 		logrus.Fatalf("%v", err)
