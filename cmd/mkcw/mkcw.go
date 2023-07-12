@@ -19,7 +19,7 @@ func main() {
 		return
 	}
 
-	var options mkcw.ConvertImageOptions
+	var options mkcw.TeeConvertImageOptions
 	var logLevel string
 	var help bool
 	flag.StringVar(&logLevel, "log-level", "error", "logging level")
@@ -90,7 +90,7 @@ func main() {
 	options.InputImage = inputName
 	options.OutputImage = outputRef
 	options.Tag = outputName
-	imageID, _, _, err := mkcw.ConvertImage(ctx, systemContext, store, options)
+	imageID, _, _, err := mkcw.TeeConvertImage(ctx, systemContext, store, options)
 	if err != nil {
 		logrus.Fatalf("%v", err)
 	}

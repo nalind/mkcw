@@ -17,10 +17,12 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/containers/buildah"
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/types"
+	encconfig "github.com/containers/ocicrypt/config"
 	"github.com/containers/storage"
 	"github.com/containers/storage/pkg/ioutils"
 	"github.com/nalind/lukstool"
@@ -28,7 +30,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type ConvertImageOptions struct {
+type TeeConvertImageOptions struct {
 	// Required parameters.
 	InputImage string
 
@@ -54,34 +56,45 @@ type ConvertImageOptions struct {
 	DiskEncryptionPassphrase   string
 	BaseImage                  string
 	Logger                     *logrus.Logger
+
+	// Passed through to buildah.BuilderOptions
+	BlobDirectory       string
+	SignaturePolicyPath string
+	ReportWriter        io.Writer
+	IDMappingOptions    *buildah.IDMappingOptions
+	Format              string
+	MaxPullRetries      int
+	PullRetryDelay      time.Duration
+	OciDecryptConfig    *encconfig.DecryptConfig
+	MountLabel          string
 }
 
 const (
-	certificateChainFilename = "sev.chain"
-	defaultCPUs              = 2
-	defaultMemory            = 512
-	defaultFilesystem        = "ext4"
+	teeCertificateChainFilename = "sev.chain"
+	teeDefaultCPUs              = 2
+	teeDefaultMemory            = 512
+	teeDefaultFilesystem        = "ext4"
 )
 
-// ConvertImage takes the rootfs and configuration from one image, generates a
+// TeeConvertImage takes the rootfs and configuration from one image, generates a
 // LUKS-encrypted disk image that more or less includes them both, and puts the
 // result into a new container image.
 // Returns the new image's ID and digest on success, along with a canonical
 // reference for it if a repository name was specified.
-func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store storage.Store, options ConvertImageOptions) (string, reference.Canonical, digest.Digest, error) {
+func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, store storage.Store, options TeeConvertImageOptions) (string, reference.Canonical, digest.Digest, error) {
 	// Apply our defaults if some options aren't set.
 	attestationURL := options.AttestationURL
 	nCPUs := options.CPUs
 	if nCPUs == 0 {
-		nCPUs = defaultCPUs
+		nCPUs = teeDefaultCPUs
 	}
 	memory := options.Memory
-	if memory < defaultMemory {
-		memory = defaultMemory
+	if memory < teeDefaultMemory {
+		memory = teeDefaultMemory
 	}
 	filesystem := options.Filesystem
 	if filesystem == "" {
-		filesystem = defaultFilesystem
+		filesystem = teeDefaultFilesystem
 	}
 	logger := options.Logger
 	if logger == nil {
@@ -98,6 +111,16 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 		FromImage:     options.BaseImage,
 		SystemContext: systemContext,
 		Logger:        logger,
+
+		BlobDirectory:       options.BlobDirectory,
+		SignaturePolicyPath: options.SignaturePolicyPath,
+		ReportWriter:        options.ReportWriter,
+		IDMappingOptions:    options.IDMappingOptions,
+		Format:              options.Format,
+		MaxPullRetries:      options.MaxPullRetries,
+		PullRetryDelay:      options.PullRetryDelay,
+		OciDecryptConfig:    options.OciDecryptConfig,
+		MountLabel:          options.MountLabel,
 	}
 	target, err := buildah.NewBuilder(ctx, store, builderOptions)
 	if err != nil {
@@ -122,8 +145,8 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 	}
 
 	// Save the certificates for the container image's root dir.
-	vendorChain := "/" + certificateChainFilename
-	cmd := exec.Command("sevctl", "export", "-f", filepath.Join(targetDir, certificateChainFilename))
+	vendorChain := "/" + teeCertificateChainFilename
+	cmd := exec.Command("sevctl", "export", "-f", filepath.Join(targetDir, teeCertificateChainFilename))
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
@@ -143,6 +166,16 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 		FromImage:     options.InputImage,
 		SystemContext: systemContext,
 		Logger:        logger,
+
+		BlobDirectory:       options.BlobDirectory,
+		SignaturePolicyPath: options.SignaturePolicyPath,
+		ReportWriter:        options.ReportWriter,
+		IDMappingOptions:    options.IDMappingOptions,
+		Format:              options.Format,
+		MaxPullRetries:      options.MaxPullRetries,
+		PullRetryDelay:      options.PullRetryDelay,
+		OciDecryptConfig:    options.OciDecryptConfig,
+		MountLabel:          options.MountLabel,
 	}
 	source, err := buildah.NewBuilder(ctx, store, builderOptions)
 	if err != nil {
