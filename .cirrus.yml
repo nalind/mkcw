@@ -5,7 +5,7 @@ docker_builder:
         DEBIAN_FRONTEND: noninteractive
     build_script: |
         apt-get -q update
-        apt-get -q install -y bats cryptsetup gcc golang podman
+        apt-get -q install -y bats cryptsetup gcc golang make podman libbtrfs-dev libgpgme-dev libdevmapper-dev
         gcc -v
         go version
         make
