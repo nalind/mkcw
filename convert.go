@@ -410,7 +410,6 @@ func ConvertImage(ctx context.Context, systemContext *types.SystemContext, store
 		AdditionalTags: []string{options.Tag},
 	}
 	return target.Commit(ctx, options.OutputImage, commitOptions)
-
 }
 
 // generate a random disk encryption password
