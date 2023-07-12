@@ -328,7 +328,7 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 		return "", nil, "", err
 	}
 	// Store the krun configuration in the container image.
-	if err = ioutils.AtomicWriteFile(filepath.Join(targetDir, ".krun-sev.json"), workloadConfigBytes, 0o600); err != nil {
+	if err = ioutils.AtomicWriteFile(filepath.Join(targetDir, "krun-sev.json"), workloadConfigBytes, 0o600); err != nil {
 		return "", nil, "", err
 	}
 
