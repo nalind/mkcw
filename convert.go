@@ -467,6 +467,38 @@ func sendRegistrationRequest(workloadConfig workloadConfig, diskEncryptionPassph
 	return nil
 }
 
+// checkLUKSPassphrase checks that the specified LUKS-encrypted file can be
+// decrypted using the specified passphrase.
+func checkLUKSPassphrase(path, decryptionPassphrase string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	v1header, v2headerA, v2headerB, v2json, err := lukstool.ReadHeaders(f, lukstool.ReadHeaderOptions{})
+	if err != nil {
+		return err
+	}
+	if v1header != nil {
+		_, _, _, _, err = v1header.Decrypt(decryptionPassphrase, f)
+		return err
+	}
+	if v2headerA == nil && v2headerB == nil {
+		return fmt.Errorf("no LUKS headers read from %q", path)
+	}
+	if v2headerA != nil {
+		if _, _, _, _, err = v2headerA.Decrypt(decryptionPassphrase, f, *v2json); err != nil {
+			return err
+		}
+	}
+	if v2headerB != nil {
+		if _, _, _, _, err = v2headerB.Decrypt(decryptionPassphrase, f, *v2json); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // generate a random disk encryption password
 func generateDiskEncryptionPassphrase() (string, error) {
 	randomizedBytes := make([]byte, 32)
