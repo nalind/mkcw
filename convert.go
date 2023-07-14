@@ -400,6 +400,83 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 	return target.Commit(ctx, options.OutputImage, commitOptions)
 }
 
+type TeeRegisterImageOptions struct {
+	// Required parameters.
+	Image                    string
+	DiskEncryptionPassphrase string
+
+	// Can be manually set.  If left unset ( false, nil), reasonable values will be used.
+	IgnoreChainRetrievalErrors bool
+	Logger                     *logrus.Logger
+
+	// Passed through to buildah.BuilderOptions. Most settings won't make
+	// sense to be made available here because we don't launch a processes.
+	ContainerSuffix     string
+	PullPolicy          buildah.PullPolicy
+	BlobDirectory       string
+	SignaturePolicyPath string
+	ReportWriter        io.Writer
+	IDMappingOptions    *buildah.IDMappingOptions
+	Format              string
+	MaxPullRetries      int
+	PullRetryDelay      time.Duration
+	OciDecryptConfig    *encconfig.DecryptConfig
+	MountLabel          string
+}
+
+// TeeRegisterImage reads the workload ID and attestation URL from an image,
+// verifies that the passed-in passphrase can be used to decrypt the image, and
+// submits a fresh registration request to the attestation server.  This isn't
+// expected to used often, but if a conversion fails at this step, and the
+// error is treated as a warning, it will be necessary.
+func TeeRegisterImage(ctx context.Context, systemContext *types.SystemContext, store storage.Store, options TeeRegisterImageOptions) error {
+	if options.DiskEncryptionPassphrase == "" {
+		return errors.New("decryption passphrase not provided")
+	}
+	logger := options.Logger
+	if logger == nil {
+		logger = logrus.StandardLogger()
+	}
+	builderOptions := buildah.BuilderOptions{
+		FromImage:     options.Image,
+		SystemContext: systemContext,
+		Logger:        logger,
+
+		ContainerSuffix:     options.ContainerSuffix,
+		PullPolicy:          options.PullPolicy,
+		BlobDirectory:       options.BlobDirectory,
+		SignaturePolicyPath: options.SignaturePolicyPath,
+		ReportWriter:        options.ReportWriter,
+		IDMappingOptions:    options.IDMappingOptions,
+		Format:              options.Format,
+		MaxPullRetries:      options.MaxPullRetries,
+		PullRetryDelay:      options.PullRetryDelay,
+		OciDecryptConfig:    options.OciDecryptConfig,
+		MountLabel:          options.MountLabel,
+	}
+	source, err := buildah.NewBuilder(ctx, store, builderOptions)
+	if err != nil {
+		return fmt.Errorf("creating container from image: %w", err)
+	}
+	defer source.Delete()
+	imageDir, err := source.Mount("")
+	if err != nil {
+		return fmt.Errorf("mounting container: %w", err)
+	}
+	imageFile := filepath.Join(imageDir, "disk.img")
+	workloadConfig, err := readWorkloadConfigFromImage(imageFile)
+	if err != nil {
+		return err
+	}
+	if err = checkLUKSPassphrase(imageFile, options.DiskEncryptionPassphrase); err != nil {
+		return err
+	}
+	if err = sendRegistrationRequest(workloadConfig, options.DiskEncryptionPassphrase, false, logger); err != nil {
+		return err
+	}
+	return nil
+}
+
 // sendRegistrationRequest registers a workload with the specified decryption
 // passphrase
 func sendRegistrationRequest(workloadConfig workloadConfig, diskEncryptionPassphrase string, ignoreAttestationErrors bool, logger *logrus.Logger) error {
