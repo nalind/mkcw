@@ -57,7 +57,10 @@ type TeeConvertImageOptions struct {
 	BaseImage                  string
 	Logger                     *logrus.Logger
 
-	// Passed through to buildah.BuilderOptions
+	// Passed through to buildah.BuilderOptions. Most settings won't make
+	// sense to be made available here because we don't launch a process.
+	ContainerSuffix     string
+	PullPolicy          buildah.PullPolicy
 	BlobDirectory       string
 	SignaturePolicyPath string
 	ReportWriter        io.Writer
@@ -112,6 +115,8 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 		SystemContext: systemContext,
 		Logger:        logger,
 
+		ContainerSuffix:     options.ContainerSuffix,
+		PullPolicy:          options.PullPolicy,
 		BlobDirectory:       options.BlobDirectory,
 		SignaturePolicyPath: options.SignaturePolicyPath,
 		ReportWriter:        options.ReportWriter,
@@ -167,6 +172,8 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 		SystemContext: systemContext,
 		Logger:        logger,
 
+		ContainerSuffix:     options.ContainerSuffix,
+		PullPolicy:          options.PullPolicy,
 		BlobDirectory:       options.BlobDirectory,
 		SignaturePolicyPath: options.SignaturePolicyPath,
 		ReportWriter:        options.ReportWriter,
