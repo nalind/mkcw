@@ -2,6 +2,7 @@ package mkcw
 
 // AttestationRequest is the body of the request which we use for registering
 // this confidential workload with the attestation server.
+// https://github.com/virtee/reference-kbs/blob/10b2a4c0f8caf78a077210b172863bbae54f66aa/src/main.rs#L83
 type attestationRequest struct {
 	WorkloadID        string `json:"workload_id"`
 	LaunchMeasurement string `json:"launch_measurement"`
