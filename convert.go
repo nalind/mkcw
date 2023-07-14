@@ -360,62 +360,11 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 		return "", nil, "", fmt.Errorf("short write appending configuration length to disk image: %d != %d", nWritten, len(teeDataLengthBytes))
 	}
 
-	// Measure the execution environment.
-	measurement, err := generateMeasurement(workloadConfig)
-	if err != nil {
-		return "", nil, "", err
-	}
-
-	// Build the workload registration (attestation) request body.
-	var teeConfigBytes []byte
-	switch teeType {
-	case SEV, SNP:
-		teeConfig := teeConfig{
-			Flags: teeConfigFlags{
-				Bits: 63,
-			},
-			MinFW: teeConfigMinFW{
-				Major: 0,
-				Minor: 0,
-			},
-		}
-		teeConfigBytes, err = json.Marshal(teeConfig)
-		if err != nil {
-			return "", nil, "", err
-		}
-	default:
-		return "", nil, "", fmt.Errorf("don't know how to generate tee_config for %q TEEs", teeType)
-	}
-	attestationRequest := attestationRequest{
-		WorkloadID:        workloadConfig.WorkloadID,
-		LaunchMeasurement: measurement,
-		TeeConfig:         string(teeConfigBytes),
-		Passphrase:        diskEncryptionPassphrase,
-	}
-	attestationRequestBytes, err := json.Marshal(attestationRequest)
-	if err != nil {
-		return "", nil, "", err
-	}
-
 	// Register the workload.
 	if attestationURL != "" {
-		url := path.Join(attestationURL, "/kbs/v0/register_workload")
-		requestContentType := "application/json"
-		requestBody := bytes.NewReader(attestationRequestBytes)
-		resp, err := http.Post(url, requestContentType, requestBody)
-		if resp != nil {
-			if resp.Body != nil {
-				resp.Body.Close()
-			}
-			if resp.StatusCode != http.StatusAccepted {
-				logger.Warnf("received status %d (%q) while registering workload", resp.StatusCode, resp.Status)
-			}
-		}
+		err = sendRegistrationRequest(workloadConfig, diskEncryptionPassphrase, options.IgnoreAttestationErrors, logger)
 		if err != nil {
-			if !options.IgnoreAttestationErrors {
-				return "", nil, "", err
-			}
-			logger.Warnf("while registering workload: %v", err)
+			return "", nil, "", err
 		}
 	}
 
@@ -428,7 +377,7 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 	target.ClearPorts()
 	target.ClearVolumes()
 	target.SetCmd(nil)
-	target.SetComment("")
+	target.SetCreatedBy(fmt.Sprintf(": convert for use with %q", teeType))
 	target.SetDomainname("")
 	target.SetEntrypoint([]string{"/entrypoint"})
 	target.SetHealthcheck(nil)
@@ -439,10 +388,76 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 	target.SetWorkDir("")
 	commitOptions := buildah.CommitOptions{
 		SystemContext:  systemContext,
-		OmitHistory:    true,
 		AdditionalTags: []string{options.Tag},
 	}
 	return target.Commit(ctx, options.OutputImage, commitOptions)
+}
+
+// sendRegistrationRequest registers a workload with the specified decryption
+// passphrase
+func sendRegistrationRequest(workloadConfig workloadConfig, diskEncryptionPassphrase string, ignoreAttestationErrors bool, logger *logrus.Logger) error {
+	if workloadConfig.AttestationURL == "" {
+		return errors.New("attestation URL not provided")
+	}
+
+	// Measure the execution environment.
+	measurement, err := generateMeasurement(workloadConfig)
+	if err != nil {
+		return err
+	}
+
+	// Build the workload registration (attestation) request body.
+	var teeConfigBytes []byte
+	switch workloadConfig.Type {
+	case SEV, SNP:
+		teeConfig := teeConfig{
+			Flags: teeConfigFlags{
+				Bits: 63,
+			},
+			MinFW: teeConfigMinFW{
+				Major: 0,
+				Minor: 0,
+			},
+		}
+		teeConfigBytes, err = json.Marshal(teeConfig)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("don't know how to generate tee_config for %q TEEs", workloadConfig.Type)
+	}
+
+	attestationRequest := attestationRequest{
+		WorkloadID:        workloadConfig.WorkloadID,
+		LaunchMeasurement: measurement,
+		TeeConfig:         string(teeConfigBytes),
+		Passphrase:        diskEncryptionPassphrase,
+	}
+	attestationRequestBytes, err := json.Marshal(attestationRequest)
+	if err != nil {
+		return err
+	}
+
+	// Register the workload.
+	url := path.Join(workloadConfig.AttestationURL, "/kbs/v0/register_workload")
+	requestContentType := "application/json"
+	requestBody := bytes.NewReader(attestationRequestBytes)
+	resp, err := http.Post(url, requestContentType, requestBody)
+	if resp != nil {
+		if resp.Body != nil {
+			resp.Body.Close()
+		}
+		if resp.StatusCode != http.StatusAccepted {
+			logger.Warnf("received status %d (%q) while registering workload", resp.StatusCode, resp.Status)
+		}
+	}
+	if err != nil {
+		if !ignoreAttestationErrors {
+			return err
+		}
+		logger.Warnf("while registering workload: %v", err)
+	}
+	return nil
 }
 
 // generate a random disk encryption password
