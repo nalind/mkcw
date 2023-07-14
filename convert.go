@@ -340,12 +340,12 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 	}
 
 	// Append the krun configuration to the disk image.
-	nWritten, err := encryptedFile.Write(teeDataBytes)
+	nWritten, err := encryptedFile.Write(workloadConfigBytes)
 	if err != nil {
 		return "", nil, "", err
 	}
-	if nWritten != len(teeDataBytes) {
-		return "", nil, "", fmt.Errorf("short write appending configuration to disk image: %d != %d", nWritten, len(teeDataBytes))
+	if nWritten != len(workloadConfigBytes) {
+		return "", nil, "", fmt.Errorf("short write appending workload configuration to disk image: %d != %d", nWritten, len(workloadConfigBytes))
 	}
 	// Append the magic string to the disk image.
 	krunMagic := "KRUN"
@@ -357,14 +357,14 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 		return "", nil, "", fmt.Errorf("short write appending krun magic to disk image: %d != %d", nWritten, len(krunMagic))
 	}
 	// Append the 64-bit little-endian length of the krun configuration to the disk image.
-	teeDataLengthBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(teeDataLengthBytes, uint64(len(teeDataBytes)))
-	nWritten, err = encryptedFile.Write(teeDataLengthBytes)
+	workloadConfigLengthBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(workloadConfigLengthBytes, uint64(len(workloadConfigBytes)))
+	nWritten, err = encryptedFile.Write(workloadConfigLengthBytes)
 	if err != nil {
 		return "", nil, "", err
 	}
-	if nWritten != len(teeDataLengthBytes) {
-		return "", nil, "", fmt.Errorf("short write appending configuration length to disk image: %d != %d", nWritten, len(teeDataLengthBytes))
+	if nWritten != len(workloadConfigLengthBytes) {
+		return "", nil, "", fmt.Errorf("short write appending workload configuration length to disk image: %d != %d", nWritten, len(workloadConfigLengthBytes))
 	}
 
 	// Register the workload.
