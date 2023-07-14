@@ -20,6 +20,7 @@ type sevWorkloadData struct {
 }
 
 const (
+	maxWorkloadConfigSize = 1024 * 1024
 	// SEV is a known trusted execution environment type: AMD-SEV
 	SEV TeeType = "sev"
 	// SNP is a known trusted execution environment type: AMD-SNP

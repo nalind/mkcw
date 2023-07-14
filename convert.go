@@ -467,6 +467,53 @@ func sendRegistrationRequest(workloadConfig workloadConfig, diskEncryptionPassph
 	return nil
 }
 
+// readWorkloadConfigFromImage reads the workload configuration from the
+// specified disk image file
+func readWorkloadConfigFromImage(path string) (workloadConfig, error) {
+	// Read the last 12 bytes, which should be "KRUN" followed by a 64-bit
+	// little-endian length.  The (length) bytes immediately preceding
+	// these hold the JSON-encoded workloadConfig.
+	var wc workloadConfig
+	f, err := os.Open(path)
+	if err != nil {
+		return wc, err
+	}
+	defer f.Close()
+
+	// Read those last 12 bytes.
+	finalTwelve := make([]byte, 12)
+	if _, err = f.Seek(12, os.SEEK_END); err != nil {
+		return wc, err
+	}
+	if n, err := f.Read(finalTwelve); err != nil || n != len(finalTwelve) {
+		if err != nil {
+			return wc, err
+		}
+		return wc, fmt.Errorf("short read (expected 12 bytes at the end of %q, got %d)", path, n)
+	}
+	if magic := string(finalTwelve[0:4]); magic != "KRUN" {
+		return wc, fmt.Errorf("expected magic string KRUN in %q, found %q)", path, magic)
+	}
+	length := binary.LittleEndian.Uint64(finalTwelve[4:])
+	if length > maxWorkloadConfigSize {
+		return wc, fmt.Errorf("workload config in %q is %d bytes long, which seems unreasonable (max allowed %d)", path, length, maxWorkloadConfigSize)
+	}
+
+	// Read and decode the config.
+	configBytes := make([]byte, length)
+	if _, err = f.Seek(int64(length)+12, os.SEEK_END); err != nil {
+		return wc, err
+	}
+	if n, err := f.Read(configBytes); err != nil || n != len(configBytes) {
+		if err != nil {
+			return wc, err
+		}
+		return wc, fmt.Errorf("short read (expected %d bytes near the end of %q, got %d)", len(configBytes), path, n)
+	}
+	err = json.Unmarshal(configBytes, &wc)
+	return wc, err
+}
+
 // checkLUKSPassphrase checks that the specified LUKS-encrypted file can be
 // decrypted using the specified passphrase.
 func checkLUKSPassphrase(path, decryptionPassphrase string) error {
