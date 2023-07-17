@@ -36,9 +36,8 @@ type TeeConvertImageOptions struct {
 	AttestationURL string
 
 	// Used to measure the environment.  If left unset (0, ""), defaults will be applied.
-	CPUs       int
-	Memory     int
-	Filesystem string
+	CPUs   int
+	Memory int
 
 	// Can be manually set.  If left unset ("", false, nil), reasonable values will be used.
 	TeeType                    mkcw.TeeType
@@ -167,7 +166,6 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 		AttestationURL:             options.AttestationURL,
 		CPUs:                       options.CPUs,
 		Memory:                     options.Memory,
-		Filesystem:                 options.Filesystem,
 		TempDir:                    targetDir,
 		TeeType:                    options.TeeType,
 		IgnoreChainRetrievalErrors: options.IgnoreChainRetrievalErrors,

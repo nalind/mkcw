@@ -9,6 +9,7 @@ import (
 // MakeFS formats the imageFile as a filesystem of the specified type,
 // populating it with the contents of the directory at sourcePath.
 // Recognized filesystem types are "ext2", "ext3", "ext4", and "btrfs".
+// Note that krun's init is currently hard-wired to assume "ext4".
 // Returns the stdout, stderr, and any error returned by the mkfs command.
 func MakeFS(sourcePath, imageFile, filesystem string) (string, string, error) {
 	var stdout, stderr strings.Builder

@@ -31,9 +31,8 @@ type ArchiveOptions struct {
 	AttestationURL string
 
 	// Used to measure the environment.  If left unset (0, ""), defaults will be applied.
-	CPUs       int
-	Memory     int
-	Filesystem string
+	CPUs   int
+	Memory int
 
 	// Can be manually set.  If left unset ("", false, nil), reasonable values will be used.
 	TempDir                    string
@@ -77,10 +76,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 	if memory == 0 {
 		memory = teeDefaultMemory
 	}
-	filesystem := options.Filesystem
-	if filesystem == "" {
-		filesystem = teeDefaultFilesystem
-	}
+	filesystem := teeDefaultFilesystem
 	workloadID := options.WorkloadID
 	if workloadID == "" {
 		digestInput := path + filesystem + time.Now().String()

@@ -28,7 +28,6 @@ func main() {
 	flag.StringVar(&options.AttestationURL, "attestation-url", "", "location of attestation server")
 	flag.IntVar(&options.CPUs, "cpu", 0, "number of expected virtual CPUs")
 	flag.IntVar(&options.Memory, "memory", 0, "amount of memory expected (MB)")
-	flag.StringVar(&options.Filesystem, "filesystem", "ext4", "filesystem type to use")
 	flag.StringVar(&options.WorkloadID, "workload-id", "", "workload ID (default: automatic)")
 	flag.StringVar(&options.DiskEncryptionPassphrase, "passphrase", "", "encryption passphrase (default: automatic)")
 	flag.StringVar(&options.BaseImage, "base-image", "", "alternate base image for final image")
