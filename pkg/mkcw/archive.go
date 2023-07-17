@@ -127,20 +127,32 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 		if chainBytes, err = ioutil.ReadFile(chain.Name()); err != nil {
 			chainBytes = []byte{}
 		}
-		var teeData SevWorkloadData
-		if len(chainBytes) > 0 {
-			chainBytesFile = "sev.chain"
-			chainInfo, err = os.Stat(chain.Name())
-			if err != nil {
-				return nil, WorkloadConfig{}, err
+		switch {
+		case teeType == SEV:
+			var teeData SevWorkloadData
+			if len(chainBytes) > 0 {
+				chainBytesFile = "sev.chain"
+				chainInfo, err = os.Stat(chain.Name())
+				if err != nil {
+					return nil, WorkloadConfig{}, err
+				}
+				teeData.VendorChain = "/" + chainBytesFile
 			}
-			teeData.VendorChain = "/" + chainBytesFile
+			encodedTeeData, err := json.Marshal(teeData)
+			if err != nil {
+				return nil, WorkloadConfig{}, fmt.Errorf("encoding tee data: %w", err)
+			}
+			workloadConfig.TeeData = string(encodedTeeData)
+		case teeType == SNP:
+			teeData := SnpWorkloadData{
+				Generation: "milan",
+			}
+			encodedTeeData, err := json.Marshal(teeData)
+			if err != nil {
+				return nil, WorkloadConfig{}, fmt.Errorf("encoding tee data: %w", err)
+			}
+			workloadConfig.TeeData = string(encodedTeeData)
 		}
-		encodedTeeData, err := json.Marshal(teeData)
-		if err != nil {
-			return nil, WorkloadConfig{}, fmt.Errorf("encoding tee data: %w", err)
-		}
-		workloadConfig.TeeData = string(encodedTeeData)
 	}
 
 	// Write part of the config blob where the krun init process will be

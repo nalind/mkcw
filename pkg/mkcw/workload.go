@@ -31,6 +31,12 @@ type SevWorkloadData struct {
 	AttestationServerPubkey string `json:"attestation_server_pubkey"`
 }
 
+// SnpWorkloadData contains the required CPU generation name.
+// https://github.com/virtee/oci2cw/blob/1502d5be33c2fa82d49aaa95781bbab2aa932781/examples/tee-config-snp.json
+type SnpWorkloadData struct {
+	Generation string `json:"gen"` // "milan"
+}
+
 const (
 	maxWorkloadConfigSize = 1024 * 1024
 	// SEV is a known trusted execution environment type: AMD-SEV
