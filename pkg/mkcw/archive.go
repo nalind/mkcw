@@ -337,10 +337,12 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 
 		// Start encrypting and write /disk.img.
 		header, encrypt, blockSize, err := lukstool.EncryptV1([]string{diskEncryptionPassphrase}, "")
+		paddingBoundary := int64(4096)
+		paddingNeeded := (paddingBoundary - ((int64(len(header)) + imageSize + int64(footer.Len())) % paddingBoundary)) % paddingBoundary
 		diskHeader := workloadConfigHeader
 		diskHeader.Name = "disk.img"
 		diskHeader.Mode = 0o600
-		diskHeader.Size = int64(len(header)) + imageSize + int64(footer.Len())
+		diskHeader.Size = int64(len(header)) + imageSize + paddingNeeded + int64(footer.Len())
 		if err = tw.WriteHeader(diskHeader); err != nil {
 			logrus.Errorf("writing archive header for disk.img: %v", err)
 			return
@@ -355,6 +357,10 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 			return
 		}
 		encryptWrapper.Close()
+		if _, err = tw.Write(make([]byte, paddingNeeded)); err != nil {
+			logrus.Errorf("writing padding for disk.img: %v", err)
+			return
+		}
 		if _, err = io.Copy(tw, &footer); err != nil {
 			logrus.Errorf("writing footer for disk.img: %v", err)
 			return
