@@ -94,16 +94,6 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 		AttestationURL: options.AttestationURL,
 	}
 
-	// Read the contents of the dummy entrypoint binary.
-	entrypointBytes, err := ioutil.ReadFile("entrypoint")
-	if err != nil {
-		return nil, WorkloadConfig{}, err
-	}
-	entrypointInfo, err := os.Stat("entrypoint")
-	if err != nil {
-		return nil, WorkloadConfig{}, err
-	}
-
 	// Do things which are specific to the type of TEE we're building for.
 	var chainBytes []byte
 	var chainBytesFile string
@@ -153,15 +143,6 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 		workloadConfig.TeeData = string(encodedTeeData)
 	}
 
-	// Make sure we have the passphrase to use for encrypting the disk image.
-	diskEncryptionPassphrase := options.DiskEncryptionPassphrase
-	if diskEncryptionPassphrase == "" {
-		diskEncryptionPassphrase, err = GenerateDiskEncryptionPassphrase()
-		if err != nil {
-			return nil, WorkloadConfig{}, err
-		}
-	}
-
 	// Write part of the config blob where the krun init process will be
 	// looking for it.  The oci2cw tool used `buildah inspect` output, but
 	// init is just looking for fields that have the right names in any
@@ -185,6 +166,15 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 	workloadConfigBytes, err := json.Marshal(workloadConfig)
 	if err != nil {
 		return nil, WorkloadConfig{}, err
+	}
+
+	// Make sure we have the passphrase to use for encrypting the disk image.
+	diskEncryptionPassphrase := options.DiskEncryptionPassphrase
+	if diskEncryptionPassphrase == "" {
+		diskEncryptionPassphrase, err = GenerateDiskEncryptionPassphrase()
+		if err != nil {
+			return nil, WorkloadConfig{}, err
+		}
 	}
 
 	// If we weren't told how big the image should be, get a rough estimate
@@ -272,17 +262,17 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 			return
 		}
 		defer plain.Close()
-		counter := ioutils.NewWriteCounter(pipeWriter)
-		tw := tar.NewWriter(counter)
+		tw := tar.NewWriter(pipeWriter)
 		defer tw.Flush()
 
 		// Write /entrypoint
-		entrypointHeader, err := tar.FileInfoHeader(entrypointInfo, "")
+		entrypointHeader, err := tar.FileInfoHeader(plainInfo, "")
 		if err != nil {
-			logrus.Errorf("building header for %q: %v", entrypointInfo.Name(), err)
+			logrus.Errorf("building header for entrypoint: %v", err)
 			return
 		}
 		entrypointHeader.Name = "entrypoint"
+		entrypointHeader.Mode = 0o755
 		entrypointHeader.Uname, entrypointHeader.Gname = "", ""
 		entrypointHeader.Uid, entrypointHeader.Gid = 0, 0
 		entrypointHeader.Size = int64(len(entrypointBytes))
@@ -303,6 +293,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 				return
 			}
 			chainHeader.Name = chainBytesFile
+			chainHeader.Mode = 0o600
 			chainHeader.Uname, chainHeader.Gname = "", ""
 			chainHeader.Uid, chainHeader.Gid = 0, 0
 			chainHeader.Size = int64(len(chainBytes))
@@ -323,6 +314,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 			return
 		}
 		workloadConfigHeader.Name = "krun-sev.json"
+		workloadConfigHeader.Mode = 0o600
 		workloadConfigHeader.Uname, workloadConfigHeader.Gname = "", ""
 		workloadConfigHeader.Uid, workloadConfigHeader.Gid = 0, 0
 		workloadConfigHeader.Size = int64(len(workloadConfigBytes))
@@ -347,6 +339,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 		header, encrypt, blockSize, err := lukstool.EncryptV1([]string{diskEncryptionPassphrase}, "")
 		diskHeader := workloadConfigHeader
 		diskHeader.Name = "disk.img"
+		diskHeader.Mode = 0o600
 		diskHeader.Size = int64(len(header)) + imageSize + int64(footer.Len())
 		if err = tw.WriteHeader(diskHeader); err != nil {
 			logrus.Errorf("writing archive header for disk.img: %v", err)

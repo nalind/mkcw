@@ -1,12 +1,12 @@
 GO = go
 BATS = bats
 
-all: mkcw entrypoint
+all: mkcw
 
-mkcw: cmd/mkcw/*.go pkg/*/*.go *.go
+mkcw: cmd/mkcw/*.go pkg/*/*.go *.go pkg/mkcw/embed/entrypoint
 	$(GO) build -o $@ ./cmd/mkcw
 
-entrypoint: cmd/entrypoint/*.c
+pkg/mkcw/embed/entrypoint: pkg/mkcw/embed/entrypoint.c
 	$(CC) -Os -s -static -o $@ $^
 
 clean:
