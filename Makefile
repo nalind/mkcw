@@ -3,7 +3,7 @@ BATS = bats
 
 all: mkcw entrypoint
 
-mkcw: cmd/mkcw/*.go *.go
+mkcw: cmd/mkcw/*.go pkg/*/*.go *.go
 	$(GO) build -o $@ ./cmd/mkcw
 
 entrypoint: cmd/entrypoint/*.c
