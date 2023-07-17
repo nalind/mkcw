@@ -157,7 +157,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 	// object, and the image's config will have that, so let's try encoding
 	// it directly.
 	krunConfigPath := filepath.Join(path, ".krun_config.json")
-	krunConfigBytes, err := json.Marshal(ociConfig.Config)
+	krunConfigBytes, err := json.Marshal(ociConfig)
 	if err != nil {
 		return nil, WorkloadConfig{}, fmt.Errorf("creating .krun_config from image configuration: %w", err)
 	}
