@@ -3,6 +3,7 @@ package mkcw
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -274,6 +275,17 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 		defer tw.Flush()
 
 		// Write /entrypoint
+		var decompressedEntrypoint bytes.Buffer
+		decompressor, err := gzip.NewReader(bytes.NewReader(entrypointCompressedBytes))
+		if err != nil {
+			logrus.Errorf("decompressing copy of entrypoint: %v", err)
+			return
+		}
+		defer decompressor.Close()
+		if _, err = io.Copy(&decompressedEntrypoint, decompressor); err != nil {
+			logrus.Errorf("decompressing copy of entrypoint: %v", err)
+			return
+		}
 		entrypointHeader, err := tar.FileInfoHeader(plainInfo, "")
 		if err != nil {
 			logrus.Errorf("building header for entrypoint: %v", err)
@@ -283,12 +295,12 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 		entrypointHeader.Mode = 0o755
 		entrypointHeader.Uname, entrypointHeader.Gname = "", ""
 		entrypointHeader.Uid, entrypointHeader.Gid = 0, 0
-		entrypointHeader.Size = int64(len(entrypointBytes))
+		entrypointHeader.Size = int64(decompressedEntrypoint.Len())
 		if err = tw.WriteHeader(entrypointHeader); err != nil {
 			logrus.Errorf("writing header for %q: %v", entrypointHeader.Name, err)
 			return
 		}
-		if _, err = tw.Write(entrypointBytes); err != nil {
+		if _, err = io.Copy(tw, &decompressedEntrypoint); err != nil {
 			logrus.Errorf("writing %q: %v", entrypointHeader.Name, err)
 			return
 		}
