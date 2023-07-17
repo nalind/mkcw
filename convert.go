@@ -1,18 +1,14 @@
 package mkcw
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/containers/buildah"
@@ -20,8 +16,7 @@ import (
 	"github.com/containers/image/v5/types"
 	encconfig "github.com/containers/ocicrypt/config"
 	"github.com/containers/storage"
-	"github.com/containers/storage/pkg/ioutils"
-	"github.com/nalind/lukstool"
+	"github.com/containers/storage/pkg/archive"
 	"github.com/nalind/mkcw/pkg/mkcw"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
@@ -69,13 +64,6 @@ type TeeConvertImageOptions struct {
 	MountLabel          string
 }
 
-const (
-	teeCertificateChainFilename = "sev.chain"
-	teeDefaultCPUs              = 2
-	teeDefaultMemory            = 512
-	teeDefaultFilesystem        = "ext4"
-)
-
 // TeeConvertImage takes the rootfs and configuration from one image, generates a
 // LUKS-encrypted disk image that more or less includes them both, and puts the
 // result into a new container image.
@@ -83,26 +71,9 @@ const (
 // reference for it if a repository name was specified.
 func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, store storage.Store, options TeeConvertImageOptions) (string, reference.Canonical, digest.Digest, error) {
 	// Apply our defaults if some options aren't set.
-	attestationURL := options.AttestationURL
-	nCPUs := options.CPUs
-	if nCPUs == 0 {
-		nCPUs = teeDefaultCPUs
-	}
-	memory := options.Memory
-	if memory < teeDefaultMemory {
-		memory = teeDefaultMemory
-	}
-	filesystem := options.Filesystem
-	if filesystem == "" {
-		filesystem = teeDefaultFilesystem
-	}
 	logger := options.Logger
 	if logger == nil {
 		logger = logrus.StandardLogger()
-	}
-	teeType := options.TeeType
-	if teeType == "" {
-		teeType = mkcw.SEV
 	}
 
 	// Now create the target working container, pulling the base image if
@@ -137,32 +108,6 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 		return "", nil, "", fmt.Errorf("creating tmp in target container: %w", err)
 	}
 
-	// Copy the entrypoint in.
-	if entrypoint, err := os.Open("entrypoint"); err == nil {
-		if targetEntrypoint, err := os.OpenFile(filepath.Join(targetDir, "entrypoint"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o700); err == nil {
-			io.Copy(targetEntrypoint, entrypoint)
-			targetEntrypoint.Close()
-		}
-		entrypoint.Close()
-	}
-
-	// Save the certificates for the container image's root dir.
-	vendorChain := "/" + teeCertificateChainFilename
-	cmd := exec.Command("sevctl", "export", "-f", filepath.Join(targetDir, teeCertificateChainFilename))
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
-		vendorChain = ""
-		if !options.IgnoreChainRetrievalErrors {
-			return "", nil, "", fmt.Errorf("retrieving SEV certificate chain: %v: %w", strings.TrimSpace(stderr.String()), err)
-		}
-		if stderr.Len() != 0 {
-			logger.Warnf("sevctl: %s: %v", strings.TrimSpace(stderr.String()), err)
-		} else {
-			logger.Warnf("sevctl: %v", err)
-		}
-	}
-
 	// Mount the source image, pulling it first if necessary.
 	builderOptions = buildah.BuilderOptions{
 		FromImage:     options.InputImage,
@@ -191,119 +136,16 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 		return "", nil, "", fmt.Errorf("retrieving info about source image: %w", err)
 	}
 	sourceImageID := sourceInfo.FromImageID
-	sourceSize, err := store.ImageSize(source.FromImageID)
+	sourceSize, err := store.ImageSize(sourceImageID)
 	if err != nil {
 		return "", nil, "", fmt.Errorf("computing size of source image: %w", err)
-	}
-	if sourceSize < 0 {
-		sourceSize = 1024 * 1024 * 1024 // wild guess, but probably better than nothing
 	}
 	sourceDir, err := source.Mount("")
 	if err != nil {
 		return "", nil, "", fmt.Errorf("mounting source container: %w", err)
 	}
 
-	// Write part of the config blob where the krun init process will be looking for it.
-	// The oci2cw tool used `buildah inspect` output, but init is just looking for
-	// fields that have the right names in any object, and the image config will
-	// have that, so let's try encoding it directly.
-	var imageConfigBytes []byte
-	if imageConfigBytes, err = json.Marshal(sourceInfo.OCIv1.Config); err != nil {
-		return "", nil, "", err
-	}
-	if err = ioutils.AtomicWriteFile(filepath.Join(sourceDir, ".krun_config.json"), imageConfigBytes, 0o600); err != nil {
-		return "", nil, "", err
-	}
-
-	// Create a blank disk image that we hope will be big enough.
-	plain := filepath.Join(targetDir, "plain.img")
-	plainFile, err := os.Create(plain)
-	if err != nil {
-		return "", nil, "", err
-	}
-	size := sourceSize * 5 / 4
-	if size%4096 != 0 {
-		size += 4096 - (size % 4096)
-	}
-	err = plainFile.Truncate(size)
-	plainFile.Close()
-	if err != nil {
-		return "", nil, "", err
-	}
-
-	// Format the blank image and populate it with the rootfs's content.
-	logger.Log(logrus.DebugLevel, "generating plaintext disk image")
-	_, stderrString, err := mkcw.MakeFS(sourceDir, plain, filesystem)
-	if err != nil {
-		return "", nil, "", fmt.Errorf("%s: %w", stderrString, err)
-	}
-	plainFile, err = os.Open(plain)
-	if err != nil {
-		return "", nil, "", err
-	}
-	defer func() {
-		if plainFile != nil {
-			plainFile.Close()
-		}
-	}()
-
-	// Choose an encryption passphrase if we weren't supplied with one.
-	diskEncryptionPassphrase := options.DiskEncryptionPassphrase
-	if diskEncryptionPassphrase == "" {
-		logger.Log(logrus.DebugLevel, "generating encryption passpharase")
-		diskEncryptionPassphrase, err = mkcw.GenerateDiskEncryptionPassphrase()
-		if err != nil {
-			return "", nil, "", err
-		}
-	}
-
-	// Encrypt the disk image for inclusion in the container image.
-	encrypted := filepath.Join(targetDir, "disk.img")
-	encryptedFile, err := os.Create(encrypted)
-	if err != nil {
-		return "", nil, "", err
-	}
-	logger.Log(logrus.DebugLevel, "encrypting disk image")
-	header, encrypt, blockSize, err := lukstool.EncryptV1([]string{diskEncryptionPassphrase}, "")
-	defer encryptedFile.Close()
-	n, err := encryptedFile.Write(header)
-	if err != nil {
-		return "", nil, "", err
-	}
-	if n != len(header) {
-		return "", nil, "", fmt.Errorf("wrote %d bytes of header intead of %d bytes", n, len(header))
-	}
-	wrapper := lukstool.EncryptWriter(encrypt, encryptedFile, blockSize)
-	_, err = io.Copy(wrapper, plainFile)
-	if err != nil {
-		return "", nil, "", err
-	}
-	err = wrapper.Close()
-	if err != nil {
-		return "", nil, "", err
-	}
-	plainFile.Close()
-	plainFile = nil
-	if err := os.Remove(plain); err != nil {
-		return "", nil, "", err
-	}
-
-	// Build the krun configuration file that we store in the container image and on the disk image.
-	logger.Log(logrus.DebugLevel, "generating workload configuration")
-	var teeDataBytes []byte
-	switch teeType {
-	case mkcw.SEV, mkcw.SNP:
-		teeData := mkcw.SevWorkloadData{
-			VendorChain:             vendorChain,
-			AttestationServerPubkey: "",
-		}
-		teeDataBytes, err = json.Marshal(teeData)
-		if err != nil {
-			return "", nil, "", err
-		}
-	default:
-		return "", nil, "", fmt.Errorf("don't know how to generate tee_data for %q TEEs", teeType)
-	}
+	// Generate a workload ID if one wasn't provided.
 	workloadID := options.WorkloadID
 	if workloadID == "" {
 		rawImageID, err := hex.DecodeString(sourceImageID)
@@ -319,38 +161,31 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 		}
 		workloadID = digest.Canonical.FromBytes(append(append([]byte{}, rawImageID...), randomizedBytes...)).Encoded()
 	}
-	workloadConfig := mkcw.WorkloadConfig{
-		Type:           teeType,
-		WorkloadID:     workloadID,
-		CPUs:           nCPUs,
-		Memory:         memory,
-		AttestationURL: attestationURL,
-		TeeData:        string(teeDataBytes),
+
+	// Generate the image contents.
+	archiveOptions := mkcw.ArchiveOptions{
+		AttestationURL:             options.AttestationURL,
+		CPUs:                       options.CPUs,
+		Memory:                     options.Memory,
+		Filesystem:                 options.Filesystem,
+		TempDir:                    targetDir,
+		TeeType:                    options.TeeType,
+		IgnoreChainRetrievalErrors: options.IgnoreChainRetrievalErrors,
+		IgnoreAttestationErrors:    options.IgnoreAttestationErrors,
+		ImageSize:                  sourceSize,
+		WorkloadID:                 workloadID,
+		DiskEncryptionPassphrase:   options.DiskEncryptionPassphrase,
+		Logger:                     logger,
 	}
-	workloadConfigBytes, err := json.Marshal(workloadConfig)
+	rc, workloadConfig, err := mkcw.Archive(sourceDir, &target.OCIv1, archiveOptions)
 	if err != nil {
-		return "", nil, "", err
+		return "", nil, "", fmt.Errorf("generating encrypted image content: %w", err)
 	}
-
-	// Store the krun configuration in the container image.
-	if err = ioutils.AtomicWriteFile(filepath.Join(targetDir, "krun-sev.json"), workloadConfigBytes, 0o600); err != nil {
-		return "", nil, "", err
+	if err = archive.Untar(rc, targetDir, &archive.TarOptions{}); err != nil {
+		return "", nil, "", fmt.Errorf("saving encrypted image content: %w", err)
 	}
-
-	// Append the krun configuration to the disk image.
-	if err = mkcw.WriteWorkloadConfigToImage(encryptedFile, workloadConfigBytes, false); err != nil {
-		return "", nil, "", err
-	}
-	if err = encryptedFile.Sync(); err != nil {
-		return "", nil, "", err
-	}
-
-	// Register the workload.
-	if attestationURL != "" {
-		err = mkcw.SendRegistrationRequest(workloadConfig, diskEncryptionPassphrase, options.IgnoreAttestationErrors, logger)
-		if err != nil {
-			return "", nil, "", err
-		}
+	if err = rc.Close(); err != nil {
+		return "", nil, "", fmt.Errorf("cleaning up: %w", err)
 	}
 
 	// Commit the image.
@@ -362,7 +197,7 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 	target.ClearPorts()
 	target.ClearVolumes()
 	target.SetCmd(nil)
-	target.SetCreatedBy(fmt.Sprintf(": convert for use with %q", teeType))
+	target.SetCreatedBy(fmt.Sprintf(": convert for use with %q", workloadConfig.Type))
 	target.SetDomainname("")
 	target.SetEntrypoint([]string{"/entrypoint"})
 	target.SetHealthcheck(nil)
@@ -383,9 +218,8 @@ type TeeRegisterImageOptions struct {
 	Image                    string
 	DiskEncryptionPassphrase string
 
-	// Can be manually set.  If left unset ( false, nil), reasonable values will be used.
-	IgnoreChainRetrievalErrors bool
-	Logger                     *logrus.Logger
+	// Can be manually set.  If left unset (false, nil), reasonable values will be used.
+	Logger *logrus.Logger
 
 	// Passed through to buildah.BuilderOptions. Most settings won't make
 	// sense to be made available here because we don't launch a processes.
