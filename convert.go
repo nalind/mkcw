@@ -195,7 +195,7 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 	target.ClearPorts()
 	target.ClearVolumes()
 	target.SetCmd(nil)
-	target.SetCreatedBy(fmt.Sprintf(": convert for use with %q", workloadConfig.Type))
+	target.SetCreatedBy(fmt.Sprintf(": convert %q for use with %q", sourceImageID, workloadConfig.Type))
 	target.SetDomainname("")
 	target.SetEntrypoint([]string{"/entrypoint"})
 	target.SetHealthcheck(nil)
