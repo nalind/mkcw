@@ -22,13 +22,13 @@ type SevWorkloadData struct {
 // SnpWorkloadData contains the required CPU generation name.
 // https://github.com/virtee/oci2cw/blob/1502d5be33c2fa82d49aaa95781bbab2aa932781/examples/tee-config-snp.json
 type SnpWorkloadData struct {
-	Generation string `json:"gen"` // "milan" (naples=1, rome=2, milan=3, genoa=4)
+	Generation string `json:"gen"` // "milan" (naples=1, rome=2, milan=3, genoa/bergamo=4)
 }
 
 const (
-	// SEV is a known trusted execution environment type: AMD-SEV
+	// SEV is a known trusted execution environment type: AMD-SEV (secure encrypted virtualization using encrypted state, requires epyc 1000 "naples")
 	SEV TeeType = "sev"
-	// SNP is a known trusted execution environment type: AMD-SNP
+	// SNP is a known trusted execution environment type: AMD-SNP (SEV secure nested pages) (requires epyc 3000 "milan")
 	SNP TeeType = "snp"
 )
 
