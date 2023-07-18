@@ -172,7 +172,16 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 	}()
 
 	// Encode the workload config, in case it fails for any reason.
-	workloadConfigBytes, err := json.Marshal(workloadConfig)
+	cleanedUpWorkloadConfig := workloadConfig
+	switch cleanedUpWorkloadConfig.Type {
+	default:
+		return nil, WorkloadConfig{}, fmt.Errorf("don't know how to canonicalize TEE type %q", cleanedUpWorkloadConfig.Type)
+	case SEV, SEV_NO_ES:
+		cleanedUpWorkloadConfig.Type = SEV
+	case SNP:
+		cleanedUpWorkloadConfig.Type = SNP
+	}
+	workloadConfigBytes, err := json.Marshal(cleanedUpWorkloadConfig)
 	if err != nil {
 		return nil, WorkloadConfig{}, err
 	}
