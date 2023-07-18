@@ -188,7 +188,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 
 	// If we weren't told how big the image should be, get a rough estimate
 	// of the input data size, then add a hedge to it.
-	imageSize := options.ImageSize
+	imageSize := options.ImageSize * 5 / 4
 	if imageSize == 0 {
 		var sourceSize int64
 		if err := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
