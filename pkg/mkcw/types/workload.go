@@ -4,7 +4,7 @@ package types
 // https://github.com/containers/libkrun/blob/57c59dc5359bdeeb8260b3493e9f63d3708f9ab9/src/vmm/src/resources.rs#L57
 type WorkloadConfig struct {
 	Type           TeeType `json:"tee"`
-	TeeData        string  `json:"tee_data"` // Type == SEV: JSON-encoded sevWorkloadData, SNP: ...? others?
+	TeeData        string  `json:"tee_data"` // Type == SEV: JSON-encoded SevWorkloadData, SNP: JSON-encoded SnpWorkloadData, others?
 	WorkloadID     string  `json:"workload_id"`
 	CPUs           int     `json:"cpus"`
 	Memory         int     `json:"ram_mib"`
@@ -22,7 +22,7 @@ type SevWorkloadData struct {
 // SnpWorkloadData contains the required CPU generation name.
 // https://github.com/virtee/oci2cw/blob/1502d5be33c2fa82d49aaa95781bbab2aa932781/examples/tee-config-snp.json
 type SnpWorkloadData struct {
-	Generation string `json:"gen"` // "milan"
+	Generation string `json:"gen"` // "milan" (naples=1, rome=2, milan=3, genoa=4)
 }
 
 const (
