@@ -103,6 +103,7 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 	if err != nil {
 		return "", nil, "", fmt.Errorf("mounting target container: %w", err)
 	}
+	defer target.Unmount()
 	if err := os.Mkdir(filepath.Join(targetDir, "tmp"), os.ModeSticky|0o777); err != nil && !errors.Is(err, os.ErrExist) {
 		return "", nil, "", fmt.Errorf("creating tmp in target container: %w", err)
 	}
@@ -143,6 +144,7 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 	if err != nil {
 		return "", nil, "", fmt.Errorf("mounting source container: %w", err)
 	}
+	defer source.Unmount()
 
 	// Generate a workload ID if one wasn't provided.
 	workloadID := options.WorkloadID
@@ -180,6 +182,9 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 		return "", nil, "", fmt.Errorf("generating encrypted image content: %w", err)
 	}
 	if err = archive.Untar(rc, targetDir, &archive.TarOptions{}); err != nil {
+		if err = rc.Close(); err != nil {
+			logger.Warnf("cleaning up: %v", err)
+		}
 		return "", nil, "", fmt.Errorf("saving encrypted image content: %w", err)
 	}
 	if err = rc.Close(); err != nil {
@@ -273,6 +278,7 @@ func TeeRegisterImage(ctx context.Context, systemContext *types.SystemContext, s
 	if err != nil {
 		return fmt.Errorf("mounting container: %w", err)
 	}
+	defer source.Unmount()
 	imageFile := filepath.Join(imageDir, "disk.img")
 	workloadConfig, err := mkcw.ReadWorkloadConfigFromImage(imageFile)
 	if err != nil {
