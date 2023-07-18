@@ -28,6 +28,8 @@ type SnpWorkloadData struct {
 const (
 	// SEV is a known trusted execution environment type: AMD-SEV (secure encrypted virtualization using encrypted state, requires epyc 1000 "naples")
 	SEV TeeType = "sev"
+	// SEV_NO_ES is a known trusted execution environment type: AMD-SEV (secure encrypted virtualization without encrypted state, requires epyc 1000 "naples")
+	SEV_NO_ES TeeType = "sev_no_es"
 	// SNP is a known trusted execution environment type: AMD-SNP (SEV secure nested pages) (requires epyc 3000 "milan")
 	SNP TeeType = "snp"
 )

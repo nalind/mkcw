@@ -99,7 +99,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 	switch teeType {
 	default:
 		return nil, WorkloadConfig{}, fmt.Errorf("don't know how to generate TeeData for TEE type %q", teeType)
-	case SEV, SNP:
+	case SEV, SEV_NO_ES:
 		// If we need a certificate chain, get it.
 		chain, err := os.CreateTemp(options.TempDir, "chain")
 		if err != nil {
@@ -127,32 +127,29 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 		if chainBytes, err = ioutil.ReadFile(chain.Name()); err != nil {
 			chainBytes = []byte{}
 		}
-		switch {
-		case teeType == SEV:
-			var teeData SevWorkloadData
-			if len(chainBytes) > 0 {
-				chainBytesFile = "sev.chain"
-				chainInfo, err = os.Stat(chain.Name())
-				if err != nil {
-					return nil, WorkloadConfig{}, err
-				}
-				teeData.VendorChain = "/" + chainBytesFile
-			}
-			encodedTeeData, err := json.Marshal(teeData)
+		var teeData SevWorkloadData
+		if len(chainBytes) > 0 {
+			chainBytesFile = "sev.chain"
+			chainInfo, err = os.Stat(chain.Name())
 			if err != nil {
-				return nil, WorkloadConfig{}, fmt.Errorf("encoding tee data: %w", err)
+				return nil, WorkloadConfig{}, err
 			}
-			workloadConfig.TeeData = string(encodedTeeData)
-		case teeType == SNP:
-			teeData := SnpWorkloadData{
-				Generation: "milan",
-			}
-			encodedTeeData, err := json.Marshal(teeData)
-			if err != nil {
-				return nil, WorkloadConfig{}, fmt.Errorf("encoding tee data: %w", err)
-			}
-			workloadConfig.TeeData = string(encodedTeeData)
+			teeData.VendorChain = "/" + chainBytesFile
 		}
+		encodedTeeData, err := json.Marshal(teeData)
+		if err != nil {
+			return nil, WorkloadConfig{}, fmt.Errorf("encoding tee data: %w", err)
+		}
+		workloadConfig.TeeData = string(encodedTeeData)
+	case SNP:
+		teeData := SnpWorkloadData{
+			Generation: "milan",
+		}
+		encodedTeeData, err := json.Marshal(teeData)
+		if err != nil {
+			return nil, WorkloadConfig{}, fmt.Errorf("encoding tee data: %w", err)
+		}
+		workloadConfig.TeeData = string(encodedTeeData)
 	}
 
 	// Write part of the config blob where the krun init process will be

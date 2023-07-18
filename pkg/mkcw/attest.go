@@ -38,13 +38,19 @@ func SendRegistrationRequest(workloadConfig WorkloadConfig, diskEncryptionPassph
 	// Build the workload registration (attestation) request body.
 	var teeConfigBytes []byte
 	switch workloadConfig.Type {
-	case SEV, SNP:
+	case SEV, SEV_NO_ES, SNP:
 		var cbits types.TeeConfigFlagBits
 		switch workloadConfig.Type {
 		case SEV:
 			cbits = types.SEV_CONFIG_NO_DEBUG |
 				types.SEV_CONFIG_NO_KEY_SHARING |
 				types.SEV_CONFIG_ENCRYPTED_STATE |
+				types.SEV_CONFIG_NO_SEND |
+				types.SEV_CONFIG_DOMAIN |
+				types.SEV_CONFIG_SEV
+		case SEV_NO_ES:
+			cbits = types.SEV_CONFIG_NO_DEBUG |
+				types.SEV_CONFIG_NO_KEY_SHARING |
 				types.SEV_CONFIG_NO_SEND |
 				types.SEV_CONFIG_DOMAIN |
 				types.SEV_CONFIG_SEV
@@ -117,6 +123,8 @@ func GenerateMeasurement(workloadConfig WorkloadConfig) (string, error) {
 	var prefix string
 	switch workloadConfig.Type {
 	case SEV:
+		prefix = "SEV-ES"
+	case SEV_NO_ES:
 		prefix = "SEV"
 	case SNP:
 		prefix = "SNP"

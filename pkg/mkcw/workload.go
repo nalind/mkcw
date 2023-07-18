@@ -19,6 +19,8 @@ const (
 	maxWorkloadConfigSize = 1024 * 1024
 	// SEV is a known trusted execution environment type: AMD-SEV
 	SEV = types.SEV
+	// SEV_NO_ES is a known trusted execution environment type: AMD-SEV without encrypted state
+	SEV_NO_ES = types.SEV_NO_ES
 	// SNP is a known trusted execution environment type: AMD-SNP
 	SNP = types.SNP
 )

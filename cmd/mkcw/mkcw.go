@@ -12,6 +12,7 @@ import (
 	"github.com/containers/storage/pkg/reexec"
 	"github.com/containers/storage/pkg/unshare"
 	"github.com/nalind/mkcw"
+	mkcwtypes "github.com/nalind/mkcw/pkg/mkcw/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,10 +22,11 @@ func main() {
 	}
 
 	var options mkcw.TeeConvertImageOptions
-	var logLevel string
+	var logLevel, teeType string
 	var help bool
 	flag.StringVar(&logLevel, "log-level", "error", "logging level")
 	flag.BoolVar(&help, "help", false, "print usage information")
+	flag.StringVar(&teeType, "type", "sev", "type of trusted execution environment")
 	flag.StringVar(&options.AttestationURL, "attestation-url", "", "location of attestation server")
 	flag.IntVar(&options.CPUs, "cpu", 0, "number of expected virtual CPUs")
 	flag.IntVar(&options.Memory, "memory", 0, "amount of memory expected (MB)")
@@ -88,6 +90,7 @@ func main() {
 		logrus.Fatalf("%v", err)
 	}
 
+	options.TeeType = mkcwtypes.TeeType(teeType)
 	options.InputImage = inputName
 	options.OutputImage = outputRef
 	options.Tag = outputName
