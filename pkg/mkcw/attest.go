@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -68,7 +68,10 @@ func SendRegistrationRequest(workloadConfig WorkloadConfig, diskEncryptionPassph
 	}
 
 	// Register the workload.
-	url := path.Join(workloadConfig.AttestationURL, "/kbs/v0/register_workload")
+	url, err := url.JoinPath(workloadConfig.AttestationURL, "/kbs/v0/register_workload")
+	if err != nil {
+		return err
+	}
 	requestContentType := "application/json"
 	requestBody := bytes.NewReader(registrationRequestBytes)
 	resp, err := http.Post(url, requestContentType, requestBody)
@@ -76,8 +79,11 @@ func SendRegistrationRequest(workloadConfig WorkloadConfig, diskEncryptionPassph
 		if resp.Body != nil {
 			resp.Body.Close()
 		}
-		if resp.StatusCode != http.StatusAccepted {
+		switch resp.StatusCode {
+		default:
 			logger.Warnf("received status %d (%q) while registering workload", resp.StatusCode, resp.Status)
+		case http.StatusOK, http.StatusAccepted:
+			// great!
 		}
 	}
 	if err != nil {
