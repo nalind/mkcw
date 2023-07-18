@@ -55,6 +55,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 		teeDefaultCPUs       = 2
 		teeDefaultMemory     = 512
 		teeDefaultFilesystem = "ext4"
+		teeDefaultTeeType    = SEV
 	)
 
 	if path == "" {
@@ -67,7 +68,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 
 	teeType := options.TeeType
 	if teeType == "" {
-		teeType = SEV
+		teeType = teeDefaultTeeType
 	}
 	cpus := options.CPUs
 	if cpus == 0 {
@@ -96,6 +97,8 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 	var chainBytesFile string
 	var chainInfo fs.FileInfo
 	switch teeType {
+	default:
+		return nil, WorkloadConfig{}, fmt.Errorf("don't know how to generate TeeData for TEE type %q", teeType)
 	case SEV, SNP:
 		// If we need a certificate chain, get it.
 		chain, err := os.CreateTemp(options.TempDir, "chain")
