@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -89,10 +90,15 @@ func SendRegistrationRequest(workloadConfig WorkloadConfig, diskEncryptionPassph
 	}
 
 	// Register the workload.
-	url, err := url.JoinPath(workloadConfig.AttestationURL, "/kbs/v0/register_workload")
+	parsedUrl, err := url.Parse(workloadConfig.AttestationURL)
 	if err != nil {
 		return err
 	}
+	parsedUrl.Path = path.Join(parsedUrl.Path, "/kbs/v0/register_workload")
+	if err != nil {
+		return err
+	}
+	url := parsedUrl.String()
 	requestContentType := "application/json"
 	requestBody := bytes.NewReader(registrationRequestBytes)
 	resp, err := http.Post(url, requestContentType, requestBody)
