@@ -177,7 +177,7 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 		DiskEncryptionPassphrase:   options.DiskEncryptionPassphrase,
 		Logger:                     logger,
 	}
-	rc, workloadConfig, err := mkcw.Archive(sourceDir, &target.OCIv1, archiveOptions)
+	rc, workloadConfig, err := mkcw.Archive(sourceDir, &source.OCIv1, archiveOptions)
 	if err != nil {
 		return "", nil, "", fmt.Errorf("generating encrypted image content: %w", err)
 	}
