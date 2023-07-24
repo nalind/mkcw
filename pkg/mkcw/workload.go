@@ -10,18 +10,17 @@ import (
 	"github.com/nalind/mkcw/pkg/mkcw/types"
 )
 
-// WorkloadConfig is the data type which is encoded and stored in an image.
-type WorkloadConfig = types.WorkloadConfig
-
-// SevWorkloadData is the type of data in WorkloadConfig.TeeData when the type is SEV.
-type SevWorkloadData = types.SevWorkloadData
-
-// SnpWorkloadData is the type of data in WorkloadConfig.TeeData when the type is SNP.
-type SnpWorkloadData = types.SnpWorkloadData
-
-// TeeType is one of the known types of trusted execution environments for which we
-// can generate suitable image contents.
-type TeeType = types.TeeType
+type (
+	// WorkloadConfig is the data type which is encoded and stored in an image.
+	WorkloadConfig = types.WorkloadConfig
+	// SevWorkloadData is the type of data in WorkloadConfig.TeeData when the type is SEV.
+	SevWorkloadData = types.SevWorkloadData
+	// SnpWorkloadData is the type of data in WorkloadConfig.TeeData when the type is SNP.
+	SnpWorkloadData = types.SnpWorkloadData
+	// TeeType is one of the known types of trusted execution environments for which we
+	// can generate suitable image contents.
+	TeeType = types.TeeType
+)
 
 const (
 	maxWorkloadConfigSize    = 1024 * 1024

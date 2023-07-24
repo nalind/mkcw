@@ -49,6 +49,18 @@ type ArchiveOptions struct {
 	Logger                     *logrus.Logger
 }
 
+type chainRetrievalError struct {
+	stderr string
+	err    error
+}
+
+func (c chainRetrievalError) Error() string {
+	if trimmed := strings.TrimSpace(c.stderr); trimmed != "" {
+		return fmt.Sprintf("retrieving SEV certificate chain: sevctl: %v: %v", strings.TrimSpace(c.stderr), c.err)
+	}
+	return fmt.Sprintf("retrieving SEV certificate chain: sevctl: %v", c.err)
+}
+
 // Archive generates a WorkloadConfig for a specified directory and produces a
 // tar archive of a container image's rootfs with the expected contents.
 // The input directory will have a ".krun_config.json" file added to it while
@@ -119,13 +131,9 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 		cmd.Stdout, cmd.Stderr = &stdout, &stderr
 		if err := cmd.Run(); err != nil {
 			if !options.IgnoreChainRetrievalErrors {
-				return nil, WorkloadConfig{}, fmt.Errorf("retrieving SEV certificate chain: %v: %w", strings.TrimSpace(stderr.String()), err)
+				return nil, WorkloadConfig{}, chainRetrievalError{stderr.String(), err}
 			}
-			if stderr.Len() != 0 {
-				logger.Warnf("sevctl: %s: %v", strings.TrimSpace(stderr.String()), err)
-			} else {
-				logger.Warnf("sevctl: %v", err)
-			}
+			logger.Warn(chainRetrievalError{stderr.String(), err}.Error())
 		}
 		if chainBytes, err = ioutil.ReadFile(chain.Name()); err != nil {
 			chainBytes = []byte{}
@@ -217,6 +225,9 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 			return nil, WorkloadConfig{}, err
 		}
 		imageSize = slop(sourceSize, options.Slop)
+		if imageSize < 10*1024*1024 {
+			imageSize = 10 * 1024 * 1024
+		}
 	}
 	if imageSize%4096 != 0 {
 		imageSize += (4096 - (imageSize % 4096))

@@ -25,8 +25,27 @@ type (
 	TeeConfigMinFW      = types.TeeConfigMinFW
 )
 
+type attestationError struct {
+	err error
+}
+
+func (a attestationError) Error() string {
+	return fmt.Sprintf("registering workload: %v", a.err)
+}
+
+type httpError struct {
+	statusCode int
+}
+
+func (h httpError) Error() string {
+	if statusText := http.StatusText(h.statusCode); statusText != "" {
+		return fmt.Sprintf("received server status %d (%q)", h.statusCode, statusText)
+	}
+	return fmt.Sprintf("received server status %d", h.statusCode)
+}
+
 // SendRegistrationRequest registers a workload with the specified decryption
-// passphrase
+// passphrase with the service whose location is part of the WorkloadConfig.
 func SendRegistrationRequest(workloadConfig WorkloadConfig, diskEncryptionPassphrase string, ignoreAttestationErrors bool, logger *logrus.Logger) error {
 	if workloadConfig.AttestationURL == "" {
 		return errors.New("attestation URL not provided")
@@ -112,21 +131,26 @@ func SendRegistrationRequest(workloadConfig WorkloadConfig, diskEncryptionPassph
 		}
 		switch resp.StatusCode {
 		default:
-			logger.Warnf("received status %d (%q) while registering workload", resp.StatusCode, resp.Status)
+			if !ignoreAttestationErrors {
+				return &attestationError{&httpError{resp.StatusCode}}
+			}
+			logger.Warn(attestationError{&httpError{resp.StatusCode}}.Error())
 		case http.StatusOK, http.StatusAccepted:
 			// great!
 		}
 	}
 	if err != nil {
 		if !ignoreAttestationErrors {
-			return err
+			return &attestationError{err}
 		}
-		logger.Warnf("while registering workload: %v", err)
+		logger.Warn(attestationError{err}.Error())
 	}
 	return nil
 }
 
-// GenerateMeasurement generates the measurement using the CPU count, memory size, and the firmware shared library, whatever it's called, wherever it is
+// GenerateMeasurement generates the runtime measurement using the CPU count,
+// memory size, and the firmware shared library, whatever it's called, wherever
+// it is.
 func GenerateMeasurement(workloadConfig WorkloadConfig) (string, error) {
 	cpuString := fmt.Sprintf("%d", workloadConfig.CPUs)
 	memoryString := fmt.Sprintf("%d", workloadConfig.Memory)
