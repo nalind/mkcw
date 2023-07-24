@@ -383,7 +383,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 			logrus.Errorf("writing encryption header for disk.img: %v", err)
 			return
 		}
-		encryptWrapper := lukstool.EncryptWriter(encrypt, ioutils.NopWriteCloser(tw), blockSize)
+		encryptWrapper := lukstool.EncryptWriter(encrypt, tw, blockSize)
 		if _, err = io.Copy(encryptWrapper, plain); err != nil {
 			logrus.Errorf("encrypting disk.img: %v", err)
 			return

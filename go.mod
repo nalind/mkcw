@@ -9,7 +9,7 @@ require (
 	github.com/containers/storage v1.48.0
 	github.com/docker/docker v24.0.4+incompatible
 	github.com/docker/go-units v0.5.0
-	github.com/nalind/lukstool v0.0.0-20230712184557-9ed07207620f
+	github.com/nalind/lukstool v0.0.0-20230724172339-a7e1e6ed4986
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0-rc4
 	github.com/sirupsen/logrus v1.9.3
