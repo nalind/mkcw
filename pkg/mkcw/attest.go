@@ -18,10 +18,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type RegistrationRequest = types.RegistrationRequest
-type TeeConfig = types.TeeConfig
-type TeeConfigFlags = types.TeeConfigFlags
-type TeeConfigMinFW = types.TeeConfigMinFW
+type (
+	RegistrationRequest = types.RegistrationRequest
+	TeeConfig           = types.TeeConfig
+	TeeConfigFlags      = types.TeeConfigFlags
+	TeeConfigMinFW      = types.TeeConfigMinFW
+)
 
 // SendRegistrationRequest registers a workload with the specified decryption
 // passphrase
@@ -60,6 +62,8 @@ func SendRegistrationRequest(workloadConfig WorkloadConfig, diskEncryptionPassph
 				types.SNP_CONFIG_MANDATORY |
 				types.SNP_CONFIG_MIGRATE_MA |
 				types.SNP_CONFIG_DEBUG
+		default:
+			panic("internal error") // shouldn't happen
 		}
 		teeConfig := TeeConfig{
 			Flags: TeeConfigFlags{
