@@ -8,10 +8,12 @@ require (
 	github.com/containers/ocicrypt v1.1.7
 	github.com/containers/storage v1.48.0
 	github.com/docker/docker v24.0.4+incompatible
+	github.com/docker/go-units v0.5.0
 	github.com/nalind/lukstool v0.0.0-20230712184557-9ed07207620f
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0-rc4
 	github.com/sirupsen/logrus v1.9.3
+	github.com/stretchr/testify v1.8.4
 )
 
 require (
@@ -40,7 +42,6 @@ require (
 	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.7.0 // indirect
 	github.com/docker/go-connections v0.4.1-0.20210727194412-58542c764a11 // indirect
-	github.com/docker/go-units v0.5.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/fsouza/go-dockerclient v1.9.7 // indirect
 	github.com/go-openapi/analysis v0.21.4 // indirect

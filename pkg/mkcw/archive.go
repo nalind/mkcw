@@ -14,10 +14,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/pkg/ioutils"
+	"github.com/docker/go-units"
 	"github.com/nalind/lukstool"
 	digest "github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -42,6 +44,7 @@ type ArchiveOptions struct {
 	IgnoreAttestationErrors    bool
 	ImageSize                  int64
 	WorkloadID                 string
+	Slop                       string
 	DiskEncryptionPassphrase   string
 	Logger                     *logrus.Logger
 }
@@ -197,7 +200,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 
 	// If we weren't told how big the image should be, get a rough estimate
 	// of the input data size, then add a hedge to it.
-	imageSize := options.ImageSize * 5 / 4
+	imageSize := slop(options.ImageSize, options.Slop)
 	if imageSize == 0 {
 		var sourceSize int64
 		if err := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
@@ -213,7 +216,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 		}); err != nil {
 			return nil, WorkloadConfig{}, err
 		}
-		imageSize = sourceSize * 5 / 4
+		imageSize = slop(sourceSize, options.Slop)
 	}
 	if imageSize%4096 != 0 {
 		imageSize += (4096 - (imageSize % 4096))
@@ -398,4 +401,25 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 	}()
 
 	return pipeReader, workloadConfig, nil
+}
+
+func slop(size int64, slop string) int64 {
+	if strings.HasSuffix(slop, "%") {
+		percentage := strings.TrimSuffix(slop, "%")
+		percent, err := strconv.ParseInt(percentage, 10, 8)
+		if err != nil {
+			logrus.Warnf("parsing percentage %q: %v", slop, err)
+		} else {
+			return size * (percent + 100) / 100
+		}
+	}
+	if slop != "" {
+		more, err := units.RAMInBytes(slop)
+		if err != nil {
+			logrus.Warnf("parsing %q as a size: %v", slop, err)
+		} else {
+			return size + more
+		}
+	}
+	return size * 5 / 4
 }

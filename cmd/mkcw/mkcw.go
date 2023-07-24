@@ -34,6 +34,7 @@ func main() {
 	flag.StringVar(&options.DiskEncryptionPassphrase, "passphrase", "", "encryption passphrase (default: automatic)")
 	flag.StringVar(&options.BaseImage, "base-image", "", "alternate base image for final image")
 	flag.StringVar(&options.MountLabel, "mount-label", "", "force SELinux mount label")
+	flag.StringVar(&options.Slop, "slop", "", "extra space to add to the image size")
 	flag.BoolVar(&options.IgnoreChainRetrievalErrors, "ignore-sevctl-errors", false, "ignore errors reading SEV certificate chain")
 	flag.BoolVar(&options.IgnoreAttestationErrors, "ignore-attestation-errors", false, "ignore errors registering workload")
 	flag.Parse()

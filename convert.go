@@ -45,6 +45,7 @@ type TeeConvertImageOptions struct {
 	IgnoreAttestationErrors    bool
 	WorkloadID                 string
 	DiskEncryptionPassphrase   string
+	Slop                       string
 	BaseImage                  string
 	Logger                     *logrus.Logger
 
@@ -175,6 +176,7 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 		ImageSize:                  sourceSize,
 		WorkloadID:                 workloadID,
 		DiskEncryptionPassphrase:   options.DiskEncryptionPassphrase,
+		Slop:                       options.Slop,
 		Logger:                     logger,
 	}
 	rc, workloadConfig, err := mkcw.Archive(sourceDir, &source.OCIv1, archiveOptions)

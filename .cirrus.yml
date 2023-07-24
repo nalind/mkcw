@@ -9,3 +9,4 @@ docker_builder:
         gcc -v
         go version
         make
+        go test -v -cover ./pkg/mkcw
