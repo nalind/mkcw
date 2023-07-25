@@ -6,9 +6,10 @@ all: mkcw
 mkcw: cmd/mkcw/*.go pkg/*/*.go *.go pkg/mkcw/embed/entrypoint.gz
 	$(GO) build -o $@ ./cmd/mkcw
 
-ifeq ($(shell go env GOARCH),amd64)
-pkg/mkcw/embed/entrypoint: pkg/mkcw/embed/entrypoint.c
-	$(CC) -Os -static -o $@ $^
+ifneq ($(shell as --version | grep x86_64),)
+pkg/mkcw/embed/entrypoint: pkg/mkcw/embed/entrypoint.s
+	$(AS) -o $(patsubst %.s,%.o,$^) $^
+	$(LD) -o $@ $(patsubst %.s,%.o,$^)
 	strip $@
 else
 .PHONY: pkg/mkcw/embed/entrypoint
@@ -19,7 +20,7 @@ pkg/mkcw/embed/entrypoint.gz: pkg/mkcw/embed/entrypoint
 	gzip -k $^
 
 clean:
-	$(RM) mkcw pkg/mkcw/embed/entrypoint pkg/mkcw/embed/entrypoint.gz mkcw.test
+	$(RM) mkcw pkg/mkcw/embed/entrypoint.o pkg/mkcw/embed/entrypoint pkg/mkcw/embed/entrypoint.gz mkcw.test
 
 test:
 	$(GO) test
