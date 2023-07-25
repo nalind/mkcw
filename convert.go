@@ -212,8 +212,10 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 	target.SetUser("")
 	target.SetWorkDir("")
 	commitOptions := buildah.CommitOptions{
-		SystemContext:  systemContext,
-		AdditionalTags: []string{options.Tag},
+		SystemContext: systemContext,
+	}
+	if options.Tag != "" {
+		commitOptions.AdditionalTags = append(commitOptions.AdditionalTags, options.Tag)
 	}
 	return target.Commit(ctx, options.OutputImage, commitOptions)
 }
