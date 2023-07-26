@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/nalind/mkcw/pkg/mkcw/types"
@@ -48,14 +50,16 @@ func ReadWorkloadConfigFromImage(path string) (WorkloadConfig, error) {
 
 	// Read those last 12 bytes.
 	finalTwelve := make([]byte, 12)
-	if _, err = f.Seek(12, os.SEEK_END); err != nil {
+	if _, err = f.Seek(-12, os.SEEK_END); err != nil {
 		return wc, fmt.Errorf("checking for workload config signature: %w", err)
 	}
 	if n, err := f.Read(finalTwelve); err != nil || n != len(finalTwelve) {
-		if err != nil {
-			return wc, fmt.Errorf("reading workload config signature: %w", err)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return wc, fmt.Errorf("reading workload config signature (%d bytes read): %w", n, err)
 		}
-		return wc, fmt.Errorf("short read (expected 12 bytes at the end of %q, got %d)", path, n)
+		if n != len(finalTwelve) {
+			return wc, fmt.Errorf("short read (expected 12 bytes at the end of %q, got %d)", path, n)
+		}
 	}
 	if magic := string(finalTwelve[0:4]); magic != "KRUN" {
 		return wc, fmt.Errorf("expected magic string KRUN in %q, found %q)", path, magic)
@@ -67,7 +71,7 @@ func ReadWorkloadConfigFromImage(path string) (WorkloadConfig, error) {
 
 	// Read and decode the config.
 	configBytes := make([]byte, length)
-	if _, err = f.Seek(int64(length)+12, os.SEEK_END); err != nil {
+	if _, err = f.Seek(-(int64(length) + 12), os.SEEK_END); err != nil {
 		return wc, fmt.Errorf("looking for workload config from disk image: %w", err)
 	}
 	if n, err := f.Read(configBytes); err != nil || n != len(configBytes) {
@@ -77,6 +81,9 @@ func ReadWorkloadConfigFromImage(path string) (WorkloadConfig, error) {
 		return wc, fmt.Errorf("short read (expected %d bytes near the end of %q, got %d)", len(configBytes), path, n)
 	}
 	err = json.Unmarshal(configBytes, &wc)
+	if err != nil {
+		err = fmt.Errorf("unmarshaling configuration %q: %w", string(configBytes), err)
+	}
 	return wc, err
 }
 
@@ -92,10 +99,12 @@ func WriteWorkloadConfigToImage(imageFile *os.File, workloadConfigBytes []byte, 
 			return fmt.Errorf("checking for workload config signature: %w", err)
 		}
 		if n, err := imageFile.Read(finalTwelve); err != nil || n != len(finalTwelve) {
-			if err != nil {
-				return fmt.Errorf("reading workload config signature: %w", err)
+			if err != nil && !errors.Is(err, io.EOF) {
+				return fmt.Errorf("reading workload config signature (%d bytes read): %w", n, err)
 			}
-			return fmt.Errorf("short read (expected 12 bytes at the end of %q, got %d)", imageFile.Name(), n)
+			if n != len(finalTwelve) {
+				return fmt.Errorf("short read (expected 12 bytes at the end of %q, got %d)", imageFile.Name(), n)
+			}
 		}
 		if magic := string(finalTwelve[0:4]); magic == "KRUN" {
 			length := binary.LittleEndian.Uint64(finalTwelve[4:])

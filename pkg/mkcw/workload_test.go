@@ -29,6 +29,10 @@ func TestReadWriteWorkloadConfig(t *testing.T) {
 	require.NoError(t, err)
 	originalSize := st.Size()
 
+	// Should get an error, since there's no workloadConfig in there to read.
+	_, err = ReadWorkloadConfigFromImage(f.Name())
+	require.Error(t, err)
+
 	// File should grow, even though we looked for an old config to overwrite.
 	err = WriteWorkloadConfigToImage(f, workloadConfig, true)
 	require.NoError(t, err)
@@ -46,9 +50,13 @@ func TestReadWriteWorkloadConfig(t *testing.T) {
 	originalSize = st.Size()
 
 	// File should grow if we're not trying to replace an old one config with a new one.
-	err = WriteWorkloadConfigToImage(f, []byte("quite a bit shorter"), false)
+	err = WriteWorkloadConfigToImage(f, []byte("{\"comment\":\"quite a bit shorter\"}"), false)
 	require.NoError(t, err)
 	st, err = f.Stat()
 	require.NoError(t, err)
 	require.Greater(t, st.Size(), originalSize)
+
+	// Should read successfully.
+	_, err = ReadWorkloadConfigFromImage(f.Name())
+	require.NoError(t, err)
 }

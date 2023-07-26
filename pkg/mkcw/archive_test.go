@@ -156,6 +156,9 @@ func TestArchive(t *testing.T) {
 					encryptedFile := filepath.Join(t.TempDir(), "encrypted.img")
 					err = os.WriteFile(encryptedFile, contents["disk.img"], 0o600)
 					require.NoError(t, err)
+					// check that we have a configuration footer in there
+					_, err = ReadWorkloadConfigFromImage(encryptedFile)
+					require.NoError(t, err)
 					// check that the attestation server got the encryption passphrase
 					handler.passphrasesLock.Lock()
 					passphrase := handler.passphrases[workloadConfig.WorkloadID]
