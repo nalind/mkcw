@@ -101,5 +101,4 @@ func main() {
 		logrus.Fatalf("%v", err)
 	}
 	fmt.Println(imageID)
-	return
 }

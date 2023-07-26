@@ -99,12 +99,20 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 	if err != nil {
 		return "", nil, "", fmt.Errorf("creating container from target image: %w", err)
 	}
-	defer target.Delete()
+	defer func() {
+		if err := target.Delete(); err != nil {
+			logrus.Warnf("deleting target container: %v", err)
+		}
+	}()
 	targetDir, err := target.Mount("")
 	if err != nil {
 		return "", nil, "", fmt.Errorf("mounting target container: %w", err)
 	}
-	defer target.Unmount()
+	defer func() {
+		if err := target.Unmount(); err != nil {
+			logrus.Warnf("unmounting target container: %v", err)
+		}
+	}()
 	if err := os.Mkdir(filepath.Join(targetDir, "tmp"), os.ModeSticky|0o777); err != nil && !errors.Is(err, os.ErrExist) {
 		return "", nil, "", fmt.Errorf("creating tmp in target container: %w", err)
 	}
@@ -131,7 +139,11 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 	if err != nil {
 		return "", nil, "", fmt.Errorf("creating container from source image: %w", err)
 	}
-	defer source.Delete()
+	defer func() {
+		if err := source.Delete(); err != nil {
+			logrus.Warnf("deleting source container: %v", err)
+		}
+	}()
 	sourceInfo := buildah.GetBuildInfo(source)
 	if err != nil {
 		return "", nil, "", fmt.Errorf("retrieving info about source image: %w", err)
@@ -145,7 +157,11 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 	if err != nil {
 		return "", nil, "", fmt.Errorf("mounting source container: %w", err)
 	}
-	defer source.Unmount()
+	defer func() {
+		if err := source.Unmount(); err != nil {
+			logrus.Warnf("unmounting source container: %v", err)
+		}
+	}()
 
 	// Generate a workload ID if one wasn't provided.
 	workloadID := options.WorkloadID
@@ -277,12 +293,20 @@ func TeeRegisterImage(ctx context.Context, systemContext *types.SystemContext, s
 	if err != nil {
 		return fmt.Errorf("creating container from image: %w", err)
 	}
-	defer source.Delete()
+	defer func() {
+		if err := source.Delete(); err != nil {
+			logrus.Warnf("deleting source container: %v", err)
+		}
+	}()
 	imageDir, err := source.Mount("")
 	if err != nil {
 		return fmt.Errorf("mounting container: %w", err)
 	}
-	defer source.Unmount()
+	defer func() {
+		if err := source.Unmount(); err != nil {
+			logrus.Warnf("unmounting source container: %v", err)
+		}
+	}()
 	imageFile := filepath.Join(imageDir, "disk.img")
 	workloadConfig, err := mkcw.ReadWorkloadConfigFromImage(imageFile)
 	if err != nil {

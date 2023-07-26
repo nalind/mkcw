@@ -50,7 +50,7 @@ func ReadWorkloadConfigFromImage(path string) (WorkloadConfig, error) {
 
 	// Read those last 12 bytes.
 	finalTwelve := make([]byte, 12)
-	if _, err = f.Seek(-12, os.SEEK_END); err != nil {
+	if _, err = f.Seek(-12, io.SeekEnd); err != nil {
 		return wc, fmt.Errorf("checking for workload config signature: %w", err)
 	}
 	if n, err := f.Read(finalTwelve); err != nil || n != len(finalTwelve) {
@@ -71,7 +71,7 @@ func ReadWorkloadConfigFromImage(path string) (WorkloadConfig, error) {
 
 	// Read and decode the config.
 	configBytes := make([]byte, length)
-	if _, err = f.Seek(-(int64(length) + 12), os.SEEK_END); err != nil {
+	if _, err = f.Seek(-(int64(length) + 12), io.SeekEnd); err != nil {
 		return wc, fmt.Errorf("looking for workload config from disk image: %w", err)
 	}
 	if n, err := f.Read(configBytes); err != nil || n != len(configBytes) {
@@ -95,7 +95,7 @@ func WriteWorkloadConfigToImage(imageFile *os.File, workloadConfigBytes []byte, 
 	var overwriteOffset int64
 	if overwrite {
 		finalTwelve := make([]byte, 12)
-		if _, err := imageFile.Seek(-12, os.SEEK_END); err != nil {
+		if _, err := imageFile.Seek(-12, io.SeekEnd); err != nil {
 			return fmt.Errorf("checking for workload config signature: %w", err)
 		}
 		if n, err := imageFile.Read(finalTwelve); err != nil || n != len(finalTwelve) {
@@ -109,7 +109,6 @@ func WriteWorkloadConfigToImage(imageFile *os.File, workloadConfigBytes []byte, 
 		if magic := string(finalTwelve[0:4]); magic == "KRUN" {
 			length := binary.LittleEndian.Uint64(finalTwelve[4:])
 			if length < maxWorkloadConfigSize {
-				overwrite = true
 				overwriteOffset = int64(length + 12)
 			}
 		}
@@ -128,7 +127,7 @@ func WriteWorkloadConfigToImage(imageFile *os.File, workloadConfigBytes []byte, 
 			if st.Size()%possiblePaddingLength != 0 {
 				continue
 			}
-			if _, err := imageFile.Seek(-possiblePaddingLength, os.SEEK_END); err != nil {
+			if _, err := imageFile.Seek(-possiblePaddingLength, io.SeekEnd); err != nil {
 				return fmt.Errorf("checking size of padding at end of file: %w", err)
 			}
 			buf := make([]byte, possiblePaddingLength)
@@ -199,7 +198,7 @@ func WriteWorkloadConfigToImage(imageFile *os.File, workloadConfigBytes []byte, 
 	}
 
 	// Write the buffer to the file, starting with padding.
-	if _, err = imageFile.Seek(-overwriteOffset, os.SEEK_END); err != nil {
+	if _, err = imageFile.Seek(-overwriteOffset, io.SeekEnd); err != nil {
 		return fmt.Errorf("preparing to write workload config: %w", err)
 	}
 	nWritten, err = imageFile.Write(padded.Bytes())
@@ -209,7 +208,7 @@ func WriteWorkloadConfigToImage(imageFile *os.File, workloadConfigBytes []byte, 
 	if nWritten != padded.Len() {
 		return fmt.Errorf("short write writing configuration to disk image: %d != %d", nWritten, padded.Len())
 	}
-	offset, err := imageFile.Seek(0, os.SEEK_CUR)
+	offset, err := imageFile.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return fmt.Errorf("preparing mark end of disk image: %w", err)
 	}

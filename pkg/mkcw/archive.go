@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -135,7 +134,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 			}
 			logger.Warn(chainRetrievalError{stderr.String(), err}.Error())
 		}
-		if chainBytes, err = ioutil.ReadFile(chain.Name()); err != nil {
+		if chainBytes, err = os.ReadFile(chain.Name()); err != nil {
 			chainBytes = []byte{}
 		}
 		var teeData SevWorkloadData

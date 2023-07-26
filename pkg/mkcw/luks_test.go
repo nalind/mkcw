@@ -12,6 +12,7 @@ import (
 
 func TestCheckLUKSPassphrase(t *testing.T) {
 	passphrase, err := GenerateDiskEncryptionPassphrase()
+	require.NoError(t, err)
 	secondPassphrase, err := GenerateDiskEncryptionPassphrase()
 	require.NoError(t, err)
 

@@ -40,6 +40,7 @@ func TestSlop(t *testing.T) {
 // dummyAttestationHandler replies with a fixed response code to requests to
 // the right path, and caches passphrases indexed by workload ID
 type dummyAttestationHandler struct {
+	t               *testing.T
 	status          int
 	passphrases     map[string]string
 	passphrasesLock sync.Mutex
@@ -48,7 +49,10 @@ type dummyAttestationHandler struct {
 func (d *dummyAttestationHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	var body bytes.Buffer
 	if req.Body != nil {
-		io.Copy(&body, req.Body)
+		if _, err := io.Copy(&body, req.Body); err != nil {
+			d.t.Logf("reading request body: %v", err)
+			return
+		}
 		req.Body.Close()
 	}
 	if req.URL != nil && req.URL.Path == "/kbs/v0/register_workload" {
@@ -100,11 +104,15 @@ func TestArchive(t *testing.T) {
 					// keep track of our listener address
 					addr := listener.Addr()
 					// serve requests on that listener
-					handler := &dummyAttestationHandler{status: status}
+					handler := &dummyAttestationHandler{t: t, status: status}
 					server := http.Server{
 						Handler: handler,
 					}
-					go server.Serve(listener)
+					go func() {
+						if err := server.Serve(listener); err != nil {
+							t.Logf("serve: %v", err)
+						}
+					}()
 					// clean up at the end of this test
 					t.Cleanup(func() { assert.NoError(t, server.Close()) })
 					// generate the container rootfs using a temporary empty directory
