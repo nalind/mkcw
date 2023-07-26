@@ -5,12 +5,12 @@ msg:
 	.globl	_start
 	.type	_start,@function
 _start:
-	movq	$1, %rax
-	movq	$2, %rdi
-	movq	$msg, %rsi
-	movq	$75, %rdx
+	movq	$1, %rax   # write
+	movq	$2, %rdi   # fd=stderr_fileno
+	movq	$msg, %rsi # message
+	movq	$75, %rdx  # length
 	syscall
-	movq	$60, %rax
-	movq	$1, %rdi
+	movq	$60, %rax  # exit
+	movq	$1, %rdi   # status=1
 	syscall
 	.section	.note.GNU-stack,"",@progbits
