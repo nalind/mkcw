@@ -166,20 +166,22 @@ func GenerateMeasurement(workloadConfig WorkloadConfig) (string, error) {
 		return "", fmt.Errorf("don't know which measurement to use for TEE type %q", workloadConfig.Type)
 	}
 
-	sharedLibraryDirs := []string{
+	sharedLibraryDirs := append([]string{
 		"/usr/local/lib64",
 		"/usr/local/lib",
 		"/lib64",
 		"/lib",
 		"/usr/lib64",
 		"/usr/lib",
-	}
+	}, strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")...)
 	libkrunfwNames := []string{
-		"/usr/lib64/libkrunfw-sev.so.3",
-		"/usr/lib64/libkrunfw-sev.so",
-		"/usr/lib64/libkrunfw-sev.so.3.11.0",
+		"libkrunfw-sev.so.3",
+		"libkrunfw-sev.so",
 	}
-	for _, sharedLibraryDir := range append(sharedLibraryDirs, strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")...) {
+	for _, sharedLibraryDir := range sharedLibraryDirs {
+		if sharedLibraryDir == "" {
+			continue
+		}
 		for _, libkrunfw := range libkrunfwNames {
 			candidate := filepath.Join(sharedLibraryDir, libkrunfw)
 			if _, err := os.Lstat(candidate); err == nil {
