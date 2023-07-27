@@ -109,7 +109,7 @@ func TestArchive(t *testing.T) {
 						Handler: handler,
 					}
 					go func() {
-						if err := server.Serve(listener); err != nil {
+						if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 							t.Logf("serve: %v", err)
 						}
 					}()

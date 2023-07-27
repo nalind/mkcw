@@ -22,6 +22,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// TeeConvertImageOptions provides both required and optional bits of
+// configuration for TeeConvertImage().
 type TeeConvertImageOptions struct {
 	// Required parameters.
 	InputImage string
@@ -236,6 +238,8 @@ func TeeConvertImage(ctx context.Context, systemContext *types.SystemContext, st
 	return target.Commit(ctx, options.OutputImage, commitOptions)
 }
 
+// TeeRegisterImageOptions provides both required and optional bits of
+// configuration for TeeRegisterImage().
 type TeeRegisterImageOptions struct {
 	// Required parameters.
 	Image                    string
