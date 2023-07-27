@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/nalind/lukstool"
+	"github.com/containers/lukstool"
 )
 
 // CheckLUKSPassphrase checks that the specified LUKS-encrypted file can be

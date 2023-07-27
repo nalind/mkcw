@@ -224,6 +224,9 @@ github.com/containers/image/v5/version
 # github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01
 ## explicit
 github.com/containers/libtrust
+# github.com/containers/lukstool v0.0.0-20230727171957-d9b14c6731ca
+## explicit; go 1.20
+github.com/containers/lukstool
 # github.com/containers/ocicrypt v1.1.7
 ## explicit; go 1.16
 github.com/containers/ocicrypt
@@ -507,9 +510,6 @@ github.com/modern-go/reflect2
 # github.com/morikuni/aec v1.0.0
 ## explicit
 github.com/morikuni/aec
-# github.com/nalind/lukstool v0.0.0-20230726210619-28c55386479e
-## explicit; go 1.20
-github.com/nalind/lukstool
 # github.com/oklog/ulid v1.3.1
 ## explicit
 github.com/oklog/ulid

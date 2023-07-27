@@ -5,11 +5,11 @@ go 1.20
 require (
 	github.com/containers/buildah v1.31.0
 	github.com/containers/image/v5 v5.26.1
+	github.com/containers/lukstool v0.0.0-20230727171957-d9b14c6731ca
 	github.com/containers/ocicrypt v1.1.7
 	github.com/containers/storage v1.48.0
 	github.com/docker/docker v24.0.4+incompatible
 	github.com/docker/go-units v0.5.0
-	github.com/nalind/lukstool v0.0.0-20230726210619-28c55386479e
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0-rc4
 	github.com/sirupsen/logrus v1.9.3

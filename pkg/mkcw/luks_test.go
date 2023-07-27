@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nalind/lukstool"
+	"github.com/containers/lukstool"
 	"github.com/stretchr/testify/require"
 )
 

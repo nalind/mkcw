@@ -17,9 +17,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containers/lukstool"
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/go-units"
-	"github.com/nalind/lukstool"
 	digest "github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
