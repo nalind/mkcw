@@ -25,6 +25,14 @@ type (
 	TeeConfigMinFW      = types.TeeConfigMinFW
 )
 
+type measurementError struct {
+	err error
+}
+
+func (m measurementError) Error() string {
+	return fmt.Sprintf("generating measurement for attestation: %v", m.err)
+}
+
 type attestationError struct {
 	err error
 }
@@ -54,7 +62,10 @@ func SendRegistrationRequest(workloadConfig WorkloadConfig, diskEncryptionPassph
 	// Measure the execution environment.
 	measurement, err := GenerateMeasurement(workloadConfig)
 	if err != nil {
-		return err
+		if !ignoreAttestationErrors {
+			return &measurementError{err}
+		}
+		logger.Warnf("generating measurement for attestation: %v", err)
 	}
 
 	// Build the workload registration (attestation) request body.
@@ -113,15 +124,15 @@ func SendRegistrationRequest(workloadConfig WorkloadConfig, diskEncryptionPassph
 	}
 
 	// Register the workload.
-	parsedUrl, err := url.Parse(workloadConfig.AttestationURL)
+	parsedURL, err := url.Parse(workloadConfig.AttestationURL)
 	if err != nil {
 		return err
 	}
-	parsedUrl.Path = path.Join(parsedUrl.Path, "/kbs/v0/register_workload")
+	parsedURL.Path = path.Join(parsedURL.Path, "/kbs/v0/register_workload")
 	if err != nil {
 		return err
 	}
-	url := parsedUrl.String()
+	url := parsedURL.String()
 	requestContentType := "application/json"
 	requestBody := bytes.NewReader(registrationRequestBytes)
 	resp, err := http.Post(url, requestContentType, requestBody)
@@ -166,14 +177,17 @@ func GenerateMeasurement(workloadConfig WorkloadConfig) (string, error) {
 		return "", fmt.Errorf("don't know which measurement to use for TEE type %q", workloadConfig.Type)
 	}
 
-	sharedLibraryDirs := append([]string{
+	sharedLibraryDirs := []string{
 		"/usr/local/lib64",
 		"/usr/local/lib",
 		"/lib64",
 		"/lib",
 		"/usr/lib64",
 		"/usr/lib",
-	}, strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")...)
+	}
+	if llp, ok := os.LookupEnv("LD_LIBRARY_PATH"); ok {
+		sharedLibraryDirs = append(sharedLibraryDirs, strings.Split(llp, ":")...)
+	}
 	libkrunfwNames := []string{
 		"libkrunfw-sev.so.3",
 		"libkrunfw-sev.so",
@@ -202,9 +216,9 @@ func GenerateMeasurement(workloadConfig WorkloadConfig) (string, error) {
 						return strings.TrimSpace(strings.TrimPrefix(line, prefix+":")), nil
 					}
 				}
-				return "", fmt.Errorf("no line starting with %q found in output from krunfw_measurement", prefix+":")
+				return "", fmt.Errorf("generating measurement: no line starting with %q found in output from krunfw_measurement", prefix+":")
 			}
 		}
 	}
-	return "", fmt.Errorf("none of %v found in %v: %w", libkrunfwNames, sharedLibraryDirs, os.ErrNotExist)
+	return "", fmt.Errorf("generating measurement: none of %v found in %v: %w", libkrunfwNames, sharedLibraryDirs, os.ErrNotExist)
 }

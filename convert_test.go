@@ -136,7 +136,7 @@ func TestTeeConvertImage(t *testing.T) {
 						assert.Error(t, err)
 						return
 					}
-					if ignoreChainRetrievalErrors {
+					if ignoreChainRetrievalErrors && ignoreAttestationErrors {
 						assert.NoError(t, err)
 					}
 					if err != nil {
