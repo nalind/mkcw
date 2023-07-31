@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/containers/buildah v1.31.0
 	github.com/containers/image/v5 v5.26.1
-	github.com/containers/lukstool v0.0.0-20230727183823-543ce0bd3bfd
+	github.com/containers/luksy v0.0.0-20230731194536-d96a0c9c323d
 	github.com/containers/ocicrypt v1.1.7
 	github.com/containers/storage v1.48.0
 	github.com/docker/docker v24.0.4+incompatible

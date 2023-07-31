@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containers/lukstool"
+	"github.com/containers/luksy"
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/go-units"
 	digest "github.com/opencontainers/go-digest"
@@ -378,7 +378,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 		footer.Write(lengthBuffer)
 
 		// Start encrypting and write /disk.img.
-		header, encrypt, blockSize, err := lukstool.EncryptV1([]string{diskEncryptionPassphrase}, "")
+		header, encrypt, blockSize, err := luksy.EncryptV1([]string{diskEncryptionPassphrase}, "")
 		paddingBoundary := int64(4096)
 		paddingNeeded := (paddingBoundary - ((int64(len(header)) + imageSize + int64(footer.Len())) % paddingBoundary)) % paddingBoundary
 		diskHeader := workloadConfigHeader
@@ -393,7 +393,7 @@ func Archive(path string, ociConfig *v1.Image, options ArchiveOptions) (io.ReadC
 			logrus.Errorf("writing encryption header for disk.img: %v", err)
 			return
 		}
-		encryptWrapper := lukstool.EncryptWriter(encrypt, tw, blockSize)
+		encryptWrapper := luksy.EncryptWriter(encrypt, tw, blockSize)
 		if _, err = io.Copy(encryptWrapper, plain); err != nil {
 			logrus.Errorf("encrypting disk.img: %v", err)
 			return

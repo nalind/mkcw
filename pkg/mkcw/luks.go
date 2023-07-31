@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/containers/lukstool"
+	"github.com/containers/luksy"
 )
 
 // CheckLUKSPassphrase checks that the specified LUKS-encrypted file can be
@@ -17,7 +17,7 @@ func CheckLUKSPassphrase(path, decryptionPassphrase string) error {
 		return err
 	}
 	defer f.Close()
-	v1header, v2headerA, v2headerB, v2json, err := lukstool.ReadHeaders(f, lukstool.ReadHeaderOptions{})
+	v1header, v2headerA, v2headerB, v2json, err := luksy.ReadHeaders(f, luksy.ReadHeaderOptions{})
 	if err != nil {
 		return err
 	}

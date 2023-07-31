@@ -61,8 +61,8 @@ github.com/containers/image/v5 v5.26.1 h1:8y3xq8GO/6y8FR+nAedHPsAFiAtOrab9qHTBpb
 github.com/containers/image/v5 v5.26.1/go.mod h1:IwlOGzTkGnmfirXxt0hZeJlzv1zVukE03WZQ203Z9GA=
 github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01 h1:Qzk5C6cYglewc+UyGf6lc8Mj2UaPTHy/iF2De0/77CA=
 github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01/go.mod h1:9rfv8iPl1ZP7aqh9YA68wnZv2NUDbXdcdPHVz0pFbPY=
-github.com/containers/lukstool v0.0.0-20230727183823-543ce0bd3bfd h1:bhuoZpIDwf5pc6H8poGSiYF/plungWeSGuMnPVTE7Vs=
-github.com/containers/lukstool v0.0.0-20230727183823-543ce0bd3bfd/go.mod h1:Y9UtIrSF8V6bz6nTwROVKl1UHZ7PK9QzZq5UsTLzq7Y=
+github.com/containers/luksy v0.0.0-20230731194536-d96a0c9c323d h1:Qr8FFrJZYlFdX/6Zn+xvXXmSc+v8JuwyJjihOfuV7F4=
+github.com/containers/luksy v0.0.0-20230731194536-d96a0c9c323d/go.mod h1:s0v1hxEB/W49t2sR9KQWpr4oq0L57b5ysJwpW8zd9VM=
 github.com/containers/ocicrypt v1.1.7 h1:thhNr4fu2ltyGz8aMx8u48Ae0Pnbip3ePP9/mzkZ/3U=
 github.com/containers/ocicrypt v1.1.7/go.mod h1:7CAhjcj2H8AYp5YvEie7oVSK2AhBY8NscCYRawuDNtw=
 github.com/containers/storage v1.48.0 h1:wiPs8J2xiFoOEAhxHDRtP6A90Jzj57VqzLRXOqeizns=
